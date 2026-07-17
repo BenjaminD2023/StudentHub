@@ -1,6 +1,32 @@
 import SwiftUI
 
+#if os(macOS)
+import AppKit
+#endif
+
+/// Top-level platform router. The phone gets a 5-tab TabView shell,
+/// the pad gets a NavigationSplitView shell, macOS keeps the existing
+/// 3-pane workspace shell.
 struct AppShellView: View {
+    var body: some View {
+        #if os(macOS)
+        MacAppShellView()
+        #else
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            IPadShellView()
+        } else {
+            IPhoneShellView()
+        }
+        #endif
+    }
+}
+
+#if os(macOS)
+/// macOS keeps the original 3-pane layout (sidebar + content +
+/// Command Hub). Small refinements only: the new sync pill in the
+/// top bar, quick capture in the toolbar, and a segmented timeline
+/// switcher. The existing workspace content is untouched.
+private struct MacAppShellView: View {
     @EnvironmentObject private var appState: AppState
     @State private var isCompactCommandPresented = false
 
@@ -74,29 +100,18 @@ struct AppShellView: View {
                 CommandHubView(onClose: { isCompactCommandPresented = false })
                     .environmentObject(appState)
                     .preferredColorScheme(appState.appearance.colorScheme)
-                    #if os(iOS)
-                    .presentationDetents([.large])
-                    #endif
             }
-            #if os(iOS)
-            .sheet(isPresented: $appState.isQuickCommandPresented) {
-                QuickCommandView(onDismiss: { appState.isQuickCommandPresented = false })
-                    .environmentObject(appState)
-                    .preferredColorScheme(appState.appearance.colorScheme)
-                    .presentationDetents([.medium, .large])
-            }
-            #endif
         }
     }
 
     private func toggleQuickCommand() {
-        #if os(macOS)
         NotificationCenter.default.post(name: .toggleQuickPanel, object: nil)
-        #else
-        appState.isQuickCommandPresented.toggle()
-        #endif
     }
 }
+#else
+/// iPhone/iPad unification: the iPad gets a sidebar + detail layout,
+/// the iPhone gets a 5-tab shell. Both reuse the same data layer.
+#endif
 
 private struct HubTopBar: View {
     @EnvironmentObject private var appState: AppState
