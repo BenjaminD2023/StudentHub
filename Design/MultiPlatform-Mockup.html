@@ -1,0 +1,1712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Student Hub — Multi-Platform Design System</title>
+<style>
+  /* ============================================================
+     DESIGN TOKENS — unified across iPhone / iPad / Mac
+     ============================================================ */
+  :root {
+    /* Colors — Light */
+    --bg-page: #F2F2F7;
+    --bg-grouped: #FFFFFF;
+    --bg-grouped-secondary: #F2F2F7;
+    --bg-nav: rgba(248, 248, 248, 0.86);
+    --bg-elevated: #FFFFFF;
+    --bg-tabbar: rgba(248, 248, 248, 0.78);
+    --bg-sidebar: #F7F8FA;
+    --bg-window: #F2F2F7;
+    --separator: rgba(60, 60, 67, 0.12);
+    --separator-opaque: #C6C6C8;
+    --label-primary: #000000;
+    --label-secondary: rgba(60, 60, 67, 0.72);
+    --label-tertiary: rgba(60, 60, 67, 0.5);
+    --label-quaternary: rgba(60, 60, 67, 0.32);
+    --tint: #1F6EEA;
+    --tint-soft: rgba(31, 110, 234, 0.12);
+    --success: #34C759;
+    --warning: #FF9500;
+    --error: #FF3B30;
+
+    /* Space colors (Course.colorChoices) */
+    --space-calc: #428CFA;
+    --space-chem: #F5B824;
+    --space-debate: #33BDC7;
+    --space-personal: #6EC763;
+    --space-general: #8A8F98;
+
+    /* Spacing scale (iOS-aligned 4pt grid) */
+    --s-1: 4px;  --s-2: 8px;  --s-3: 12px;  --s-4: 16px;
+    --s-5: 20px; --s-6: 24px; --s-8: 32px;  --s-10: 40px;
+
+    /* Radius */
+    --r-sm: 8px;  --r-md: 12px;  --r-lg: 16px;  --r-xl: 22px;  --r-pill: 999px;
+
+    /* Type — iOS HIG */
+    --f-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+    --f-rounded: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif;
+
+    /* Shadow */
+    --shadow-elev-1: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-elev-2: 0 4px 12px rgba(0,0,0,0.08);
+    --shadow-phone: 0 30px 80px -20px rgba(0,0,0,0.35), 0 10px 30px -10px rgba(0,0,0,0.2);
+    --shadow-mac: 0 30px 80px -20px rgba(0,0,0,0.30), 0 10px 30px -10px rgba(0,0,0,0.15);
+    --shadow-ipad: 0 30px 60px -20px rgba(0,0,0,0.30), 0 10px 25px -10px rgba(0,0,0,0.15);
+
+    /* Frame sizes */
+    --phone-w: 393px;   --phone-h: 852px;
+    --ipad-w: 1194px;   --ipad-h: 834px;     /* 11" landscape */
+    --ipad-p-w: 834px;  --ipad-p-h: 1194px;  /* 11" portrait */
+    --mac-w: 1280px;    --mac-h: 800px;
+  }
+
+  [data-theme="dark"] {
+    --bg-page: #000000;
+    --bg-grouped: #1C1C1E;
+    --bg-grouped-secondary: #000000;
+    --bg-nav: rgba(28, 28, 30, 0.86);
+    --bg-elevated: #2C2C2E;
+    --bg-tabbar: rgba(22, 22, 24, 0.82);
+    --bg-sidebar: #15151A;
+    --bg-window: #0B0B0E;
+    --separator: rgba(84, 84, 88, 0.34);
+    --separator-opaque: #38383A;
+    --label-primary: #FFFFFF;
+    --label-secondary: rgba(235, 235, 245, 0.66);
+    --label-tertiary: rgba(235, 235, 245, 0.42);
+    --label-quaternary: rgba(235, 235, 245, 0.22);
+    --tint: #5A8EF5;
+    --tint-soft: rgba(90, 142, 245, 0.18);
+    --space-calc: #5B9BFF;
+    --space-chem: #FFC83A;
+    --space-debate: #4DD4DD;
+    --space-personal: #7DDD72;
+    --space-general: #A0A5AE;
+  }
+
+  /* ============================================================
+     PAGE — gallery wrapper
+     ============================================================ */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: var(--f-display);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    color: var(--label-primary);
+    background: #E8EAF0;
+    min-height: 100vh;
+  }
+  [data-theme="dark"] body { background: #0B0B0E; }
+
+  .gallery {
+    padding: 48px 32px 80px;
+    max-width: 1800px;
+    margin: 0 auto;
+  }
+  .gallery-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .gallery-header .eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--tint);
+    margin-bottom: 12px;
+  }
+  .gallery-header h1 {
+    font-size: 44px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--label-primary);
+    margin-bottom: 12px;
+  }
+  .gallery-header p {
+    font-size: 17px;
+    color: var(--label-secondary);
+    max-width: 720px;
+    margin: 0 auto 24px;
+    line-height: 1.5;
+  }
+  .controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-grouped);
+    border: 1px solid var(--separator);
+    border-radius: var(--r-pill);
+    padding: 6px;
+    box-shadow: var(--shadow-elev-1);
+  }
+  .controls button {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    font: inherit;
+    color: var(--label-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: var(--r-pill);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .controls button.active {
+    background: var(--tint);
+    color: white;
+  }
+  .controls button:hover:not(.active) { color: var(--label-primary); }
+
+  .section-title {
+    text-align: center;
+    margin: 64px 0 32px;
+  }
+  .section-title .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--tint);
+    margin-bottom: 6px;
+  }
+  .section-title h2 {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .section-title p {
+    font-size: 15px;
+    color: var(--label-secondary);
+    margin-top: 8px;
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 48px;
+    align-items: flex-start;
+    margin-bottom: 48px;
+  }
+  .row.ipad-row, .row.mac-row { gap: 56px; }
+  .device-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+  .device-card .label {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--label-secondary);
+  }
+
+  /* ============================================================
+     FRAME BASICS
+     ============================================================ */
+  .iphone, .ipad, .mac {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background: var(--bg-page);
+  }
+  .iphone {
+    width: var(--phone-w);
+    height: var(--phone-h);
+    border-radius: 56px;
+    box-shadow: var(--shadow-phone);
+    border: 2px solid #1a1a1c;
+  }
+  .iphone::before {
+    content: ""; position: absolute; inset: 0;
+    border-radius: 56px;
+    border: 1px solid rgba(255,255,255,0.06);
+    pointer-events: none; z-index: 200;
+  }
+  .ipad {
+    width: var(--ipad-w);
+    height: var(--ipad-h);
+    border-radius: 18px;
+    box-shadow: var(--shadow-ipad);
+    border: 2px solid #1a1a1c;
+  }
+  .ipad::before {
+    content: ""; position: absolute; inset: 0;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.06);
+    pointer-events: none; z-index: 200;
+  }
+  .mac {
+    width: var(--mac-w);
+    height: var(--mac-h);
+    border-radius: 12px;
+    box-shadow: var(--shadow-mac);
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+  .mac::before {
+    content: ""; position: absolute; inset: 0;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+    pointer-events: none; z-index: 200;
+  }
+
+  /* iPhone status bar */
+  .status-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 54px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 32px 8px;
+    z-index: 60;
+    pointer-events: none;
+    color: var(--label-primary);
+  }
+  .status-time { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .status-icons { display: flex; align-items: center; gap: 6px; }
+  .status-icons svg { width: 17px; height: 12px; }
+  .dynamic-island {
+    position: absolute;
+    top: 11px; left: 50%;
+    transform: translateX(-50%);
+    width: 124px; height: 36px;
+    background: #000; border-radius: 22px;
+    z-index: 70;
+  }
+
+  /* Mac title bar */
+  .mac-titlebar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 32px;
+    background: var(--bg-sidebar);
+    border-bottom: 0.5px solid var(--separator);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    z-index: 60;
+  }
+  .traffic { display: flex; gap: 8px; }
+  .traffic span {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    display: block;
+  }
+  .traffic .red { background: #FF5F57; }
+  .traffic .yellow { background: #FEBC2E; }
+  .traffic .green { background: #28C840; }
+  .mac-title {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--label-secondary);
+  }
+  .mac-toolbar { display: flex; gap: 4px; }
+  .mac-toolbar-btn {
+    width: 28px; height: 22px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 5px;
+    color: var(--label-secondary);
+  }
+  .mac-toolbar-btn:hover { background: var(--tint-soft); color: var(--tint); }
+  .mac-toolbar-btn svg { width: 16px; height: 16px; }
+
+  /* iPad top bar (no notch on iPad, but has a small status area) */
+  .ipad-status {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--label-primary);
+    z-index: 60;
+    pointer-events: none;
+  }
+  .ipad-status .right { display: flex; align-items: center; gap: 6px; }
+  .ipad-status svg { width: 16px; height: 11px; }
+
+  /* ============================================================
+     iPHONE — reuses styles from iPhone-Redesign-Mockup.html
+     ============================================================ */
+  .screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .screen.active { display: flex; }
+
+  /* ============ shared tab bar (iPhone) ============ */
+  .tabbar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: calc(78px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--bg-tabbar);
+    backdrop-filter: saturate(180%) blur(28px);
+    -webkit-backdrop-filter: saturate(180%) blur(28px);
+    border-top: 0.5px solid var(--separator);
+    display: flex;
+    align-items: stretch;
+    z-index: 50;
+  }
+  .tab {
+    flex: 1;
+    appearance: none;
+    background: transparent;
+    border: 0;
+    font: inherit;
+    color: var(--label-secondary);
+    cursor: pointer;
+    padding: 8px 0 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .tab.active { color: var(--tint); }
+  .tab svg { width: 26px; height: 26px; }
+  .tab-label { font-size: 10px; font-weight: 500; letter-spacing: 0.01em; }
+  .home-indicator {
+    position: absolute;
+    bottom: 8px; left: 50%;
+    transform: translateX(-50%);
+    width: 134px; height: 5px;
+    background: var(--label-primary);
+    border-radius: 3px; z-index: 60; opacity: 0.85;
+  }
+
+  /* ============ shared content elements ============ */
+  .navbar {
+    flex-shrink: 0;
+    padding: 54px 16px 8px;
+    background: var(--bg-page);
+  }
+  .navbar.compact { padding-top: 16px; }
+  .nav-large { padding-top: 6px; padding-bottom: 4px; }
+  .nav-large .nav-title {
+    font-size: 34px; font-weight: 700;
+    letter-spacing: -0.02em; line-height: 1.05;
+  }
+  .nav-subtitle { font-size: 14px; color: var(--label-secondary); margin-top: 2px; }
+  .navbar-row {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 32px; padding: 0 4px;
+  }
+  .nav-btn {
+    appearance: none; background: transparent; border: 0;
+    color: var(--tint); width: 36px; height: 36px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .nav-btn:hover { background: var(--tint-soft); }
+  .nav-btn svg { width: 20px; height: 20px; }
+  .nav-btn-circle { background: var(--tint-soft); }
+
+  .scroll {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    padding: 0 16px calc(96px + env(safe-area-inset-bottom, 0px));
+    scrollbar-width: none;
+  }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  .section { margin-top: 22px; }
+  .section-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 0 4px 6px;
+    text-transform: uppercase; font-size: 12px; font-weight: 600;
+    letter-spacing: 0.06em; color: var(--label-secondary);
+  }
+  .section-header .link {
+    color: var(--tint); font-size: 13px; text-transform: none;
+    letter-spacing: 0; font-weight: 500;
+  }
+
+  .grouped {
+    background: var(--bg-grouped);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+  }
+  .grouped-secondary { background: var(--bg-grouped-secondary); border-radius: var(--r-lg); overflow: hidden; }
+  .row {
+    display: flex; align-items: center; gap: 12px;
+    min-height: 44px; padding: 10px 14px;
+    border-bottom: 0.5px solid var(--separator);
+    position: relative;
+  }
+  .row:last-child { border-bottom: 0; }
+  .row.tappable { cursor: pointer; }
+  .row-icon {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: white; flex-shrink: 0;
+  }
+  .row-icon svg { width: 16px; height: 16px; }
+  .row-text { flex: 1; min-width: 0; }
+  .row-title { font-size: 16px; font-weight: 500; color: var(--label-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-sub { font-size: 12px; color: var(--label-secondary); margin-top: 1px; }
+  .row-trailing { color: var(--label-tertiary); font-size: 14px; display: flex; align-items: center; gap: 4px; }
+  .row-trailing .chevron { color: var(--label-quaternary); }
+  .pill { font-size: 12px; padding: 3px 8px; border-radius: var(--r-pill); font-weight: 500; background: var(--tint-soft); color: var(--tint); }
+
+  .checkbox {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 1.5px solid var(--label-quaternary);
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent;
+    transition: all 0.15s ease;
+  }
+  .checkbox.checked { background: var(--success); border-color: var(--success); }
+  .checkbox.checked svg { display: block; }
+  .checkbox svg { display: none; color: white; width: 13px; height: 13px; }
+  .row.done .row-title { text-decoration: line-through; color: var(--label-tertiary); }
+
+  .greeting { padding: 8px 4px 0; }
+  .greeting .hello { font-size: 14px; font-weight: 600; color: var(--label-secondary); text-transform: uppercase; letter-spacing: 0.06em; }
+  .greeting .today-date { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; margin-top: 2px; }
+
+  .sync-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px 5px 8px;
+    background: var(--bg-grouped);
+    border: 0.5px solid var(--separator);
+    border-radius: var(--r-pill);
+    font-size: 12px; font-weight: 500; color: var(--label-secondary);
+    margin-top: 10px;
+  }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+  .sync-dot.syncing { background: var(--tint); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .capture {
+    margin-top: 16px;
+    background: var(--bg-grouped);
+    border-radius: var(--r-md);
+    padding: 4px 4px 4px 14px;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: var(--shadow-elev-1);
+  }
+  .capture-icon { color: var(--label-tertiary); flex-shrink: 0; }
+  .capture-icon svg { width: 18px; height: 18px; display: block; }
+  .capture input {
+    flex: 1; border: 0; background: transparent;
+    font: inherit; font-size: 15px; color: var(--label-primary);
+    outline: none; padding: 10px 0;
+  }
+  .capture input::placeholder { color: var(--label-tertiary); }
+  .capture-btn {
+    appearance: none; background: var(--tint); color: white; border: 0;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .capture-btn svg { width: 16px; height: 16px; }
+
+  .timeline { background: var(--bg-grouped); border-radius: var(--r-lg); padding: 4px 0; overflow: hidden; }
+  .tl-block { display: flex; gap: 12px; padding: 10px 14px; align-items: flex-start; position: relative; }
+  .tl-block + .tl-block { border-top: 0.5px solid var(--separator); }
+  .tl-time { width: 60px; flex-shrink: 0; font-size: 13px; font-weight: 600; color: var(--label-secondary); font-variant-numeric: tabular-nums; }
+  .tl-time .ampm { font-size: 10px; font-weight: 500; color: var(--label-tertiary); margin-top: 1px; }
+  .tl-card {
+    flex: 1; border-left: 3px solid var(--space-calc);
+    padding: 6px 10px; border-radius: 6px;
+    background: var(--bg-page);
+  }
+  .tl-card .title { font-size: 15px; font-weight: 600; }
+  .tl-card .sub { font-size: 12px; color: var(--label-secondary); margin-top: 2px; }
+  .tl-card.chem { border-left-color: var(--space-chem); }
+  .tl-card.calc { border-left-color: var(--space-calc); }
+  .tl-card.debate { border-left-color: var(--space-debate); }
+  .tl-card.personal { border-left-color: var(--space-personal); }
+  .tl-now {
+    position: absolute; left: 56px; right: 0; top: 50%;
+    height: 1px; background: var(--error); opacity: 0.6; z-index: 2;
+  }
+  .tl-now::before {
+    content: ""; position: absolute; left: -5px; top: -4px;
+    width: 9px; height: 9px; background: var(--error); border-radius: 50%;
+  }
+
+  .chip-row { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 8px; margin: 0 -16px; padding-left: 16px; padding-right: 16px; scrollbar-width: none; }
+  .chip-row::-webkit-scrollbar { display: none; }
+  .chip {
+    flex-shrink: 0; padding: 6px 12px;
+    background: var(--bg-grouped); border: 0.5px solid var(--separator);
+    border-radius: var(--r-pill); font-size: 13px; font-weight: 500;
+    color: var(--label-primary); cursor: pointer;
+  }
+  .chip.active { background: var(--tint); color: white; border-color: var(--tint); }
+
+  .quicklinks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .ql { aspect-ratio: 1; background: var(--bg-grouped); border-radius: var(--r-md); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; }
+  .ql-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; }
+  .ql-icon svg { width: 18px; height: 18px; }
+  .ql-label { font-size: 11px; font-weight: 500; color: var(--label-secondary); }
+
+  .more-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .more-card { background: var(--bg-grouped); border-radius: var(--r-lg); padding: 16px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; min-height: 110px; }
+  .more-icon { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: white; }
+  .more-icon svg { width: 20px; height: 20px; }
+  .more-name { font-size: 15px; font-weight: 600; }
+  .more-count { font-size: 12px; color: var(--label-secondary); }
+
+  .week-strip { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--bg-grouped); border-radius: var(--r-md); padding: 8px 4px; margin-top: 4px; }
+  .week-day { text-align: center; padding: 6px 0; border-radius: var(--r-sm); }
+  .week-day .dow { font-size: 10px; color: var(--label-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; }
+  .week-day .dom { font-size: 18px; font-weight: 600; margin-top: 2px; }
+  .week-day.today { background: var(--tint); }
+  .week-day.today .dow { color: rgba(255,255,255,0.85); }
+  .week-day.today .dom { color: white; font-weight: 700; }
+  .week-day.has-event .dom { position: relative; }
+  .week-day.has-event .dom::after { content: ""; position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background: var(--tint); border-radius: 50%; }
+  .week-day.today.has-event .dom::after { background: white; }
+
+  .day-timeline { background: var(--bg-grouped); border-radius: var(--r-lg); padding: 12px 0; }
+  .day-hour { display: flex; gap: 12px; padding: 4px 14px; min-height: 48px; position: relative; }
+  .day-hour .hour-label { width: 46px; font-size: 11px; font-weight: 600; color: var(--label-tertiary); font-variant-numeric: tabular-nums; }
+  .day-hour .hour-content { flex: 1; border-top: 0.5px solid var(--separator); position: relative; }
+  .day-block { position: absolute; left: 0; right: 0; border-radius: 6px; padding: 4px 8px; font-size: 12px; color: white; line-height: 1.2; overflow: hidden; }
+  .day-block .db-title { font-weight: 600; }
+  .day-block .db-sub { font-size: 11px; opacity: 0.85; margin-top: 1px; }
+  .day-block.calc { background: var(--space-calc); }
+  .day-block.chem { background: var(--space-chem); color: #1a1a1a; }
+  .day-block.debate { background: var(--space-debate); }
+  .day-block.personal { background: var(--space-personal); }
+
+  .fab {
+    position: absolute; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); right: 20px;
+    width: 56px; height: 56px; border-radius: 28px; background: var(--tint);
+    color: white; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 20px rgba(31, 110, 234, 0.4);
+    border: 0; cursor: pointer; z-index: 40;
+  }
+  .fab svg { width: 24px; height: 24px; }
+
+  /* ============================================================
+     iPAD LAYOUT
+     ============================================================ */
+  .ipad-body {
+    position: absolute;
+    top: 24px; left: 0; right: 0; bottom: 0;
+    display: flex;
+  }
+  /* iPad sidebar (NavigationSplitView column) */
+  .ipad-sidebar {
+    width: 264px;
+    background: var(--bg-sidebar);
+    border-right: 0.5px solid var(--separator);
+    display: flex;
+    flex-direction: column;
+    padding: 12px 8px;
+    overflow-y: auto;
+  }
+  .ipad-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-page);
+    overflow: hidden;
+  }
+  .ipad-topbar {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: var(--bg-page);
+    border-bottom: 0.5px solid var(--separator);
+  }
+  .ipad-topbar .tb-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .ipad-topbar .tb-actions { display: flex; align-items: center; gap: 6px; }
+
+  .ipad-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 24px 32px;
+    scrollbar-width: none;
+  }
+  .ipad-scroll::-webkit-scrollbar { display: none; }
+
+  /* Sidebar group */
+  .sb-group { margin-bottom: 12px; }
+  .sb-group-label {
+    font-size: 11px; font-weight: 600;
+    color: var(--label-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 8px 10px 4px;
+  }
+  .sb-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--label-primary);
+    cursor: pointer;
+    margin-bottom: 1px;
+  }
+  .sb-item.active {
+    background: var(--tint-soft);
+    color: var(--tint);
+  }
+  .sb-item:hover:not(.active) { background: rgba(0,0,0,0.04); }
+  [data-theme="dark"] .sb-item:hover:not(.active) { background: rgba(255,255,255,0.06); }
+  .sb-item .icon { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
+  .sb-item .icon svg { width: 16px; height: 16px; }
+  .sb-item .label { flex: 1; }
+  .sb-item .count {
+    font-size: 12px;
+    color: var(--label-tertiary);
+    font-variant-numeric: tabular-nums;
+  }
+  .sb-item .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* iPad uses 2-column card grid for the Today dashboard */
+  .ipad-2col { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+  .ipad-card {
+    background: var(--bg-grouped);
+    border-radius: var(--r-lg);
+    padding: 16px;
+  }
+  .ipad-card h3 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--label-secondary);
+    margin-bottom: 12px;
+  }
+
+  /* iPad timeline block (more spacing) */
+  .ipad-tl-block {
+    display: flex;
+    gap: 16px;
+    padding: 10px 0;
+    align-items: flex-start;
+    border-bottom: 0.5px solid var(--separator);
+  }
+  .ipad-tl-block:last-child { border-bottom: 0; }
+  .ipad-tl-time {
+    width: 70px;
+    flex-shrink: 0;
+    font-size: 13px; font-weight: 600;
+    color: var(--label-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .ipad-tl-time .ampm { font-size: 10px; color: var(--label-tertiary); margin-top: 1px; }
+  .ipad-tl-card {
+    flex: 1;
+    border-left: 3px solid var(--space-calc);
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: var(--bg-page);
+  }
+  .ipad-tl-card.chem { border-left-color: var(--space-chem); }
+  .ipad-tl-card.calc { border-left-color: var(--space-calc); }
+  .ipad-tl-card.debate { border-left-color: var(--space-debate); }
+  .ipad-tl-card.personal { border-left-color: var(--space-personal); }
+  .ipad-tl-card .title { font-size: 15px; font-weight: 600; }
+  .ipad-tl-card .sub { font-size: 12px; color: var(--label-secondary); margin-top: 2px; }
+
+  /* ============================================================
+     MAC LAYOUT
+     ============================================================ */
+  .mac-body {
+    position: absolute;
+    top: 32px; left: 0; right: 0; bottom: 0;
+    display: flex;
+  }
+  .mac-sidebar {
+    width: 244px;
+    background: var(--bg-sidebar);
+    border-right: 0.5px solid var(--separator);
+    display: flex;
+    flex-direction: column;
+    padding: 12px 8px;
+  }
+  .mac-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-page);
+    overflow: hidden;
+  }
+  .mac-content-toolbar {
+    height: 44px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 0.5px solid var(--separator);
+  }
+  .mac-content-toolbar .ctb-left { display: flex; align-items: center; gap: 12px; }
+  .mac-content-toolbar .ctb-title { font-size: 14px; font-weight: 600; }
+  .mac-content-toolbar .ctb-right { display: flex; align-items: center; gap: 8px; }
+  .mac-segmented {
+    display: inline-flex;
+    background: var(--bg-grouped-secondary);
+    border-radius: 7px;
+    padding: 2px;
+  }
+  .mac-segmented button {
+    appearance: none; background: transparent; border: 0;
+    font: inherit; font-size: 12px; font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 5px;
+    color: var(--label-secondary);
+    cursor: pointer;
+  }
+  .mac-segmented button.active {
+    background: var(--bg-grouped);
+    color: var(--label-primary);
+    box-shadow: var(--shadow-elev-1);
+  }
+  .mac-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 28px 32px;
+  }
+  .mac-toolbar-btn-mini {
+    appearance: none; background: transparent; border: 0;
+    color: var(--label-secondary);
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .mac-toolbar-btn-mini:hover { background: rgba(0,0,0,0.06); color: var(--label-primary); }
+  [data-theme="dark"] .mac-toolbar-btn-mini:hover { background: rgba(255,255,255,0.08); }
+  .mac-toolbar-btn-mini svg { width: 16px; height: 16px; }
+
+  /* Mac timeline (richer than iPhone) */
+  .mac-timeline {
+    background: var(--bg-grouped);
+    border-radius: 12px;
+    padding: 8px 0;
+    border: 0.5px solid var(--separator);
+  }
+  .mac-tl-row {
+    display: flex; gap: 12px;
+    padding: 6px 14px;
+    min-height: 40px;
+    align-items: center;
+    position: relative;
+  }
+  .mac-tl-row + .mac-tl-row { border-top: 0.5px solid var(--separator); }
+  .mac-tl-time {
+    width: 70px; flex-shrink: 0;
+    font-size: 11px; font-weight: 600;
+    color: var(--label-tertiary);
+    font-variant-numeric: tabular-nums;
+  }
+  .mac-tl-content { flex: 1; position: relative; }
+  .mac-tl-block {
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: white;
+    line-height: 1.3;
+  }
+  .mac-tl-block .title { font-weight: 600; }
+  .mac-tl-block .sub { font-size: 11px; opacity: 0.85; margin-top: 1px; }
+  .mac-tl-block.chem { background: var(--space-chem); color: #1a1a1a; }
+  .mac-tl-block.calc { background: var(--space-calc); }
+  .mac-tl-block.debate { background: var(--space-debate); }
+
+  /* Command Hub panel */
+  .mac-command {
+    width: 360px;
+    background: var(--bg-sidebar);
+    border-left: 0.5px solid var(--separator);
+    display: flex;
+    flex-direction: column;
+  }
+  .mac-command-header {
+    padding: 12px 14px;
+    border-bottom: 0.5px solid var(--separator);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .mac-command-title {
+    font-size: 13px; font-weight: 600;
+  }
+  .mac-command-tabs {
+    display: flex; gap: 4px; padding: 0 12px;
+    border-bottom: 0.5px solid var(--separator);
+  }
+  .mac-command-tab {
+    padding: 8px 10px;
+    font-size: 12px; font-weight: 500;
+    color: var(--label-secondary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -0.5px;
+  }
+  .mac-command-tab.active {
+    color: var(--label-primary);
+    border-bottom-color: var(--tint);
+  }
+  .mac-command-body {
+    flex: 1; overflow-y: auto;
+    padding: 8px 12px;
+  }
+  .cmd-input {
+    width: 100%;
+    border: 0;
+    background: var(--bg-grouped);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--label-primary);
+    outline: none;
+    margin-bottom: 8px;
+  }
+  .cmd-input:focus { box-shadow: 0 0 0 2px var(--tint-soft); }
+  .cmd-item {
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .cmd-item:hover { background: rgba(0,0,0,0.04); }
+  [data-theme="dark"] .cmd-item:hover { background: rgba(255,255,255,0.06); }
+  .cmd-item.selected { background: var(--tint-soft); }
+  .cmd-item .ti { font-size: 13px; font-weight: 600; }
+  .cmd-item .si { font-size: 11px; color: var(--label-secondary); margin-top: 2px; }
+  .cmd-item .meta { display: flex; gap: 4px; margin-top: 4px; }
+
+  /* ============================================================
+     DESIGN NOTES
+     ============================================================ */
+  .design-notes {
+    margin: 80px auto 0;
+    max-width: 1100px;
+    padding: 32px;
+    background: var(--bg-grouped);
+    border: 1px solid var(--separator);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-elev-1);
+  }
+  [data-theme="dark"] .design-notes { background: #15151A; }
+  .design-notes h2 { font-size: 24px; margin-bottom: 16px; }
+  .design-notes h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--tint); margin-top: 24px; margin-bottom: 8px; }
+  .design-notes p, .design-notes li { font-size: 15px; line-height: 1.6; color: var(--label-secondary); }
+  .design-notes ul { padding-left: 18px; }
+  .design-notes li { margin-bottom: 4px; }
+  .design-notes .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; }
+  .design-notes .grid .item { background: var(--bg-grouped-secondary); padding: 16px; border-radius: var(--r-md); }
+  .design-notes .grid .item strong { color: var(--label-primary); display: block; font-size: 13px; margin-bottom: 4px; }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .swatch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--label-secondary); }
+  .swatch .dot { width: 14px; height: 14px; border-radius: 4px; }
+
+  @media (max-width: 1400px) {
+    .ipad { transform: scale(0.85); transform-origin: top center; }
+    .mac { transform: scale(0.85); transform-origin: top center; }
+  }
+  @media (max-width: 900px) {
+    .mac { transform: scale(0.7); transform-origin: top center; }
+  }
+</style>
+</head>
+<body data-theme="light">
+
+<div class="gallery">
+  <div class="gallery-header">
+    <div class="eyebrow">Multi-Platform Design System · v1</div>
+    <h1>Student Hub, on every screen.</h1>
+    <p>One design system, three idioms. iPhone, iPad, and Mac all share the same HubPalette, Space colors, typography, and component vocabulary — but each form factor uses the navigation pattern that fits how people actually hold and use it.</p>
+    <div class="controls">
+      <button id="themeLight" class="active" onclick="setTheme('light')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        Light
+      </button>
+      <button id="themeDark" onclick="setTheme('dark')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        Dark
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================== iPHONE SECTION ===================== -->
+  <div class="section-title">
+    <div class="eyebrow">Platform 01 · iPhone</div>
+    <h2>5-Tab · thumb-first</h2>
+    <p>Bottom TabBar for one-handed reach. Each tab = own NavigationStack. Native List with swipe actions and searchable. See the full iPhone mockup for the detail.</p>
+  </div>
+
+  <div class="row">
+    <!-- iPhone: Today -->
+    <div class="device-card">
+      <div class="label">iPhone · Today</div>
+      <div class="iphone">
+        <div class="status-bar">
+          <div class="status-time">9:41</div>
+          <div class="status-icons">
+            <svg viewBox="0 0 17 12" fill="currentColor"><path d="M1 8h2v4H1zM5 5h2v7H5zM9 2h2v10H9zM13 0h2v12h-2z"/></svg>
+            <svg viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.4C5.6 2.4 3.4 3.2 1.6 4.6L.4 3.4C2.5 1.7 5.2.7 8 .7s5.5 1 7.6 2.7L14.4 4.6C12.6 3.2 10.4 2.4 8 2.4zm0 4c-1.5 0-2.9.5-4 1.4l-1.2-1.2C4.3 5.4 6.1 4.7 8 4.7s3.7.7 5.2 1.9L12 7.8c-1.1-.9-2.5-1.4-4-1.4zm0 3.6c-.5 0-1 .2-1.4.5L8 12l1.4-1.5c-.4-.3-.9-.5-1.4-.5z"/></svg>
+            <svg viewBox="0 0 27 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="2.5" stroke="currentColor" fill="none" stroke-width="1"/><rect x="2" y="3" width="16" height="6" rx="1"/><rect x="23" y="4" width="1.5" height="4" rx="0.5"/></svg>
+          </div>
+        </div>
+        <div class="dynamic-island"></div>
+        <div class="screen active">
+          <div class="navbar">
+            <div class="greeting">
+              <div class="hello">Good afternoon</div>
+              <div class="today-date">Friday, July 17</div>
+              <div class="sync-pill"><span class="sync-dot"></span>Synced · 3 devices</div>
+            </div>
+            <div class="navbar-row" style="margin-top: 4px;">
+              <button class="nav-btn nav-btn-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+              <button class="nav-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 1 0 9 9c0-.5-.4-1-1-1h-1a4 4 0 0 1-4-4V6c0-.6-.5-1-1-1h-2z"/></svg></button>
+            </div>
+          </div>
+          <div class="scroll">
+            <div class="capture">
+              <span class="capture-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span>
+              <input placeholder='Try "Math hw tomorrow 8pm"' />
+              <button class="capture-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg></button>
+            </div>
+            <div class="section">
+              <div class="section-header">Schedule · Today</div>
+              <div class="timeline">
+                <div class="tl-block">
+                  <div class="tl-time">10:00<div class="ampm">AM</div></div>
+                  <div class="tl-card chem"><div class="title">Chemistry Lab</div><div class="sub">Stoichiometry · Room 202</div></div>
+                </div>
+                <div class="tl-block" style="position:relative;">
+                  <div class="tl-time">11:00<div class="ampm">AM</div></div>
+                  <div class="tl-card calc"><div class="title">AP Calculus AB</div><div class="sub">Limits worksheet · Room 300</div></div>
+                  <div class="tl-now"></div>
+                </div>
+                <div class="tl-block">
+                  <div class="tl-time">3:30<div class="ampm">PM</div></div>
+                  <div class="tl-card debate"><div class="title">Debate Practice</div><div class="sub">Court case prep · Room 110</div></div>
+                </div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-header">Due today <span style="color:var(--tint)">4</span></div>
+              <div class="grouped">
+                <div class="row tappable">
+                  <button class="checkbox" onclick="this.classList.toggle('checked')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                  <div class="row-text"><div class="row-title">Stoichiometry problem set</div><div class="row-sub"><span style="color:var(--space-chem);font-weight:600">●</span> Chemistry · 5:00 PM</div></div>
+                </div>
+                <div class="row tappable">
+                  <button class="checkbox" onclick="this.classList.toggle('checked')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                  <div class="row-text"><div class="row-title">Limits worksheet</div><div class="row-sub"><span style="color:var(--space-calc);font-weight:600">●</span> AP Calculus · 7:00 PM</div></div>
+                </div>
+                <div class="row tappable done">
+                  <button class="checkbox checked" onclick="this.classList.toggle('checked')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                  <div class="row-text"><div class="row-title">Court case prep outline</div><div class="row-sub"><span style="color:var(--space-debate);font-weight:600">●</span> Debate · 11:59 PM</div></div>
+                </div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-header">Quick actions</div>
+              <div class="quicklinks">
+                <div class="ql"><div class="ql-icon" style="background:var(--tint)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg></div><div class="ql-label">Pomodoro</div></div>
+                <div class="ql"><div class="ql-icon" style="background:var(--space-calc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></div><div class="ql-label">Note</div></div>
+                <div class="ql"><div class="ql-icon" style="background:var(--space-debate)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="ql-label">Reminder</div></div>
+                <div class="ql"><div class="ql-icon" style="background:var(--space-chem)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div><div class="ql-label">Schedule</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <button class="tab active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><div class="tab-label">Today</div></button>
+          <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><div class="tab-label">Tasks</div></button>
+          <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><div class="tab-label">Calendar</div></button>
+          <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg><div class="tab-label">Notes</div></button>
+          <button class="tab"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg><div class="tab-label">More</div></button>
+        </div>
+        <div class="home-indicator"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== iPAD SECTION ===================== -->
+  <div class="section-title">
+    <div class="eyebrow">Platform 02 · iPad (11")</div>
+    <h2>NavigationSplitView · sidebar + content</h2>
+    <p>iPadOS-native two-column layout. Sidebar for primary navigation (always visible at this width), main content area for the selected section. Same color tokens, same Space colors, more breathing room. Slides between Today / Tasks / Calendar / Notes / Projects / Library / Output without losing context.</p>
+  </div>
+
+  <div class="row ipad-row">
+    <div class="device-card">
+      <div class="label">iPad · Today (landscape)</div>
+      <div class="ipad">
+        <div class="ipad-status">
+          <span>9:41 AM</span>
+          <span class="right">
+            <span>100%</span>
+            <svg viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.4C5.6 2.4 3.4 3.2 1.6 4.6L.4 3.4C2.5 1.7 5.2.7 8 .7s5.5 1 7.6 2.7L14.4 4.6C12.6 3.2 10.4 2.4 8 2.4zm0 4c-1.5 0-2.9.5-4 1.4l-1.2-1.2C4.3 5.4 6.1 4.7 8 4.7s3.7.7 5.2 1.9L12 7.8c-1.1-.9-2.5-1.4-4-1.4zm0 3.6c-.5 0-1 .2-1.4.5L8 12l1.4-1.5c-.4-.3-.9-.5-1.4-.5z"/></svg>
+          </span>
+        </div>
+        <div class="ipad-body">
+          <!-- Sidebar -->
+          <aside class="ipad-sidebar">
+            <div style="padding: 6px 10px; margin-bottom: 12px;">
+              <div style="font-size: 18px; font-weight: 700; letter-spacing: -0.01em;">Student Hub</div>
+              <div class="sync-pill" style="margin-top: 6px;">
+                <span class="sync-dot"></span>Synced · 3 devices
+              </div>
+            </div>
+
+            <div class="sb-group">
+              <div class="sb-group-label">Now</div>
+              <div class="sb-item active">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></span>
+                <span class="label">Today</span>
+                <span class="count">3</span>
+              </div>
+              <div class="sb-item">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span>
+                <span class="label">Inbox</span>
+                <span class="count">4</span>
+              </div>
+            </div>
+
+            <div class="sb-group">
+              <div class="sb-group-label">Plan</div>
+              <div class="sb-item">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+                <span class="label">All Tasks</span>
+                <span class="count">12</span>
+              </div>
+              <div class="sb-item">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+                <span class="label">Calendar</span>
+              </div>
+              <div class="sb-item">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6v8H2zM2 13h6v8H2zM10 3h12v6H10zM10 11h12v10H10z"/></svg></span>
+                <span class="label">Projects</span>
+                <span class="count">3</span>
+              </div>
+            </div>
+
+            <div class="sb-group">
+              <div class="sb-group-label">Library</div>
+              <div class="sb-item">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg></span>
+                <span class="label">Notes</span>
+                <span class="count">12</span>
+              </div>
+              <div class="sb-item">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg></span>
+                <span class="label">Files & PDFs</span>
+                <span class="count">8</span>
+              </div>
+              <div class="sb-item">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg></span>
+                <span class="label">Journal</span>
+              </div>
+              <div class="sb-item">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg></span>
+                <span class="label">Meetings</span>
+              </div>
+            </div>
+
+            <div class="sb-group">
+              <div class="sb-group-label">Spaces</div>
+              <div class="sb-item">
+                <span class="dot" style="background:var(--space-chem)"></span>
+                <span class="label">Chemistry</span>
+                <span class="count">3</span>
+              </div>
+              <div class="sb-item">
+                <span class="dot" style="background:var(--space-calc)"></span>
+                <span class="label">AP Calculus</span>
+                <span class="count">2</span>
+              </div>
+              <div class="sb-item">
+                <span class="dot" style="background:var(--space-debate)"></span>
+                <span class="label">Debate</span>
+                <span class="count">1</span>
+              </div>
+              <div class="sb-item">
+                <span class="dot" style="background:var(--space-personal)"></span>
+                <span class="label">Personal</span>
+                <span class="count">2</span>
+              </div>
+              <div class="sb-item">
+                <span class="dot" style="background:var(--space-general)"></span>
+                <span class="label">General</span>
+                <span class="count">4</span>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Main content -->
+          <main class="ipad-content">
+            <div class="ipad-topbar">
+              <div class="tb-title">Today · Friday, July 17</div>
+              <div class="tb-actions">
+                <button class="nav-btn" title="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></button>
+                <button class="nav-btn" title="Sync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-15-6.7L3 8M3 12a9 9 0 0 0 15 6.7l3-2.7M3 3v5h5M21 21v-5h-5"/></svg></button>
+                <button class="nav-btn" title="Quick Command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+              </div>
+            </div>
+
+            <div class="ipad-scroll">
+              <div class="capture" style="max-width: 720px; margin-bottom: 24px;">
+                <span class="capture-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span>
+                <input placeholder="Quick capture · natural language (e.g. “Bio chapter 4 due Friday”)" />
+                <button class="capture-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg></button>
+              </div>
+
+              <div class="ipad-2col">
+                <div class="ipad-card">
+                  <h3>Today's Schedule</h3>
+                  <div>
+                    <div class="ipad-tl-block">
+                      <div class="ipad-tl-time">10:00<div class="ampm">AM</div></div>
+                      <div class="ipad-tl-card chem">
+                        <div class="title">Chemistry Lab</div>
+                        <div class="sub">Stoichiometry · Room 202 · 1h 15m</div>
+                      </div>
+                    </div>
+                    <div class="ipad-tl-block" style="position:relative;">
+                      <div class="ipad-tl-time">1:00<div class="ampm">PM</div></div>
+                      <div class="ipad-tl-card calc">
+                        <div class="title">AP Calculus AB</div>
+                        <div class="sub">Limits worksheet · Room 300 · 1h 15m</div>
+                      </div>
+                    </div>
+                    <div class="ipad-tl-block">
+                      <div class="ipad-tl-time">3:30<div class="ampm">PM</div></div>
+                      <div class="ipad-tl-card debate">
+                        <div class="title">Debate Practice</div>
+                        <div class="sub">Court case prep · Room 110 · 1h 30m</div>
+                      </div>
+                    </div>
+                    <div class="ipad-tl-block">
+                      <div class="ipad-tl-time">7:00<div class="ampm">PM</div></div>
+                      <div class="ipad-tl-card personal">
+                        <div class="title">Read Chapter 4</div>
+                        <div class="sub">Biology · Personal</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="ipad-card">
+                  <h3>Due Today · 4</h3>
+                  <div class="grouped" style="background: transparent;">
+                    <div class="row" style="padding: 8px 0; border-bottom: 0.5px solid var(--separator);">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text">
+                        <div class="row-title">Stoichiometry problem set</div>
+                        <div class="row-sub"><span style="color:var(--space-chem);font-weight:600">●</span> Chemistry · 5:00 PM</div>
+                      </div>
+                    </div>
+                    <div class="row" style="padding: 8px 0; border-bottom: 0.5px solid var(--separator);">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text">
+                        <div class="row-title">Limits worksheet</div>
+                        <div class="row-sub"><span style="color:var(--space-calc);font-weight:600">●</span> AP Calculus · 7:00 PM</div>
+                      </div>
+                    </div>
+                    <div class="row" style="padding: 8px 0; border-bottom: 0.5px solid var(--separator);">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text">
+                        <div class="row-title">Court case prep outline</div>
+                        <div class="row-sub"><span style="color:var(--space-debate);font-weight:600">●</span> Debate · 11:59 PM</div>
+                      </div>
+                    </div>
+                    <div class="row" style="padding: 8px 0;">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text">
+                        <div class="row-title">Read Chapter 4</div>
+                        <div class="row-sub"><span style="color:var(--space-personal);font-weight:600">●</span> Personal · 9:30 PM</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top: 24px;">
+                <div class="ipad-card">
+                  <h3>Pinned Spaces</h3>
+                  <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;">
+                    <div style="text-align: center;">
+                      <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--space-chem); margin: 0 auto 6px;"></div>
+                      <div style="font-size: 12px; font-weight: 600;">Chemistry</div>
+                      <div style="font-size: 11px; color: var(--label-tertiary);">3 tasks</div>
+                    </div>
+                    <div style="text-align: center;">
+                      <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--space-calc); margin: 0 auto 6px;"></div>
+                      <div style="font-size: 12px; font-weight: 600;">AP Calc</div>
+                      <div style="font-size: 11px; color: var(--label-tertiary);">2 tasks</div>
+                    </div>
+                    <div style="text-align: center;">
+                      <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--space-debate); margin: 0 auto 6px;"></div>
+                      <div style="font-size: 12px; font-weight: 600;">Debate</div>
+                      <div style="font-size: 11px; color: var(--label-tertiary);">1 task</div>
+                    </div>
+                    <div style="text-align: center;">
+                      <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--space-personal); margin: 0 auto 6px;"></div>
+                      <div style="font-size: 12px; font-weight: 600;">Personal</div>
+                      <div style="font-size: 11px; color: var(--label-tertiary);">2 tasks</div>
+                    </div>
+                    <div style="text-align: center;">
+                      <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--space-general); margin: 0 auto 6px;"></div>
+                      <div style="font-size: 12px; font-weight: 600;">General</div>
+                      <div style="font-size: 11px; color: var(--label-tertiary);">4 tasks</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+
+    <div class="device-card">
+      <div class="label">iPad · Tasks (landscape)</div>
+      <div class="ipad">
+        <div class="ipad-status">
+          <span>9:41 AM</span>
+          <span class="right">
+            <span>100%</span>
+            <svg viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.4C5.6 2.4 3.4 3.2 1.6 4.6L.4 3.4C2.5 1.7 5.2.7 8 .7s5.5 1 7.6 2.7L14.4 4.6C12.6 3.2 10.4 2.4 8 2.4zm0 4c-1.5 0-2.9.5-4 1.4l-1.2-1.2C4.3 5.4 6.1 4.7 8 4.7s3.7.7 5.2 1.9L12 7.8c-1.1-.9-2.5-1.4-4-1.4zm0 3.6c-.5 0-1 .2-1.4.5L8 12l1.4-1.5c-.4-.3-.9-.5-1.4-.5z"/></svg>
+          </span>
+        </div>
+        <div class="ipad-body">
+          <aside class="ipad-sidebar">
+            <div style="padding: 6px 10px; margin-bottom: 12px;">
+              <div style="font-size: 18px; font-weight: 700;">Student Hub</div>
+            </div>
+            <div class="sb-group">
+              <div class="sb-group-label">Now</div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/></svg></span><span class="label">Today</span><span class="count">3</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/></svg></span><span class="label">Inbox</span><span class="count">4</span></div>
+            </div>
+            <div class="sb-group">
+              <div class="sb-group-label">Plan</div>
+              <div class="sb-item active"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/></svg></span><span class="label">All Tasks</span><span class="count">12</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></span><span class="label">Calendar</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6v8H2zM2 13h6v8H2z"/></svg></span><span class="label">Projects</span><span class="count">3</span></div>
+            </div>
+            <div class="sb-group">
+              <div class="sb-group-label">Library</div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/></svg></span><span class="label">Notes</span><span class="count">12</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/></svg></span><span class="label">Files & PDFs</span><span class="count">8</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/></svg></span><span class="label">Journal</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5"/></svg></span><span class="label">Meetings</span></div>
+            </div>
+            <div class="sb-group">
+              <div class="sb-group-label">Spaces</div>
+              <div class="sb-item"><span class="dot" style="background:var(--space-chem)"></span><span class="label">Chemistry</span><span class="count">3</span></div>
+              <div class="sb-item"><span class="dot" style="background:var(--space-calc)"></span><span class="label">AP Calculus</span><span class="count">2</span></div>
+              <div class="sb-item"><span class="dot" style="background:var(--space-debate)"></span><span class="label">Debate</span><span class="count">1</span></div>
+              <div class="sb-item"><span class="dot" style="background:var(--space-personal)"></span><span class="label">Personal</span><span class="count">2</span></div>
+              <div class="sb-item"><span class="dot" style="background:var(--space-general)"></span><span class="label">General</span><span class="count">4</span></div>
+            </div>
+          </aside>
+
+          <main class="ipad-content">
+            <div class="ipad-topbar">
+              <div class="tb-title">All Tasks · 12 open</div>
+              <div class="tb-actions">
+                <button class="nav-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></button>
+                <button class="nav-btn" style="background: var(--tint); color: white; width: auto; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 600;">+ New Task</button>
+              </div>
+            </div>
+            <div class="ipad-scroll">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="ipad-card">
+                  <h3><span style="color:var(--space-chem)">●</span> Chemistry <span style="color:var(--label-tertiary); margin-left: 6px;">3</span></h3>
+                  <div class="grouped" style="background: transparent;">
+                    <div class="row" style="padding: 10px 0; border-bottom: 0.5px solid var(--separator);">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title">Stoichiometry problem set</div><div class="row-sub">Today · 5:00 PM</div></div>
+                    </div>
+                    <div class="row" style="padding: 10px 0; border-bottom: 0.5px solid var(--separator);">
+                      <button class="checkbox checked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title" style="text-decoration: line-through; color: var(--label-tertiary);">Lab notebook scan</div><div class="row-sub">Yesterday</div></div>
+                    </div>
+                    <div class="row" style="padding: 10px 0;">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title">Periodic table review</div><div class="row-sub">Mon, Jul 20</div></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="ipad-card">
+                  <h3><span style="color:var(--space-calc)">●</span> AP Calculus <span style="color:var(--label-tertiary); margin-left: 6px;">2</span></h3>
+                  <div class="grouped" style="background: transparent;">
+                    <div class="row" style="padding: 10px 0; border-bottom: 0.5px solid var(--separator);">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title">Limits worksheet</div><div class="row-sub">Today · 7:00 PM</div></div>
+                    </div>
+                    <div class="row" style="padding: 10px 0;">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title">Derivatives Chapter 3</div><div class="row-sub">Wed, Jul 22</div></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="ipad-card">
+                  <h3><span style="color:var(--space-debate)">●</span> Debate <span style="color:var(--label-tertiary); margin-left: 6px;">1</span></h3>
+                  <div class="grouped" style="background: transparent;">
+                    <div class="row" style="padding: 10px 0;">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title">Court case prep outline</div><div class="row-sub">Today · 11:59 PM</div></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="ipad-card">
+                  <h3><span style="color:var(--space-general)">●</span> Inbox <span style="color:var(--label-tertiary); margin-left: 6px;">2</span></h3>
+                  <div class="grouped" style="background: transparent;">
+                    <div class="row" style="padding: 10px 0; border-bottom: 0.5px solid var(--separator);">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title">Email TA about lab partner</div><div class="row-sub">No due date</div></div>
+                    </div>
+                    <div class="row" style="padding: 10px 0;">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title">Buy graph paper</div><div class="row-sub">Tomorrow</div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MAC SECTION ===================== -->
+  <div class="section-title">
+    <div class="eyebrow">Platform 03 · Mac</div>
+    <h2>3-pane · sidebar + content + Command Hub</h2>
+    <p>The familiar desktop layout, refined. Same sidebar vocabulary as iPad. The new sync pill and quick capture are now in the toolbar. Command Hub on the right stays open by default at this width. The redesign tightens the visual system without disrupting the workflow Mac users already love.</p>
+  </div>
+
+  <div class="row mac-row">
+    <div class="device-card">
+      <div class="label">Mac · Today + Command Hub</div>
+      <div class="mac">
+        <div class="mac-titlebar">
+          <div class="traffic">
+            <span class="red"></span>
+            <span class="yellow"></span>
+            <span class="green"></span>
+          </div>
+          <div class="mac-title">Student Hub</div>
+          <div class="mac-toolbar">
+            <button class="mac-toolbar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></button>
+            <button class="mac-toolbar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg></button>
+          </div>
+        </div>
+        <div class="mac-body">
+          <aside class="mac-sidebar">
+            <div style="padding: 6px 10px; margin-bottom: 12px;">
+              <div style="font-size: 16px; font-weight: 700;">Student Hub</div>
+              <div class="sync-pill" style="margin-top: 6px; font-size: 11px; padding: 3px 8px 3px 6px;">
+                <span class="sync-dot"></span>Synced · 3 devices
+              </div>
+            </div>
+            <div class="sb-group">
+              <div class="sb-group-label">Now</div>
+              <div class="sb-item active"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/></svg></span><span class="label">Today</span><span class="count">3</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/></svg></span><span class="label">Inbox</span><span class="count">4</span></div>
+            </div>
+            <div class="sb-group">
+              <div class="sb-group-label">Plan</div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/></svg></span><span class="label">All Tasks</span><span class="count">12</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></span><span class="label">Calendar</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6v8H2z"/></svg></span><span class="label">Projects</span><span class="count">3</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/></svg></span><span class="label">Pomodoro</span></div>
+            </div>
+            <div class="sb-group">
+              <div class="sb-group-label">Library</div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/></svg></span><span class="label">Notes</span><span class="count">12</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/></svg></span><span class="label">Files & PDFs</span><span class="count">8</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/></svg></span><span class="label">Journal</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5"/></svg></span><span class="label">Meetings</span></div>
+              <div class="sb-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg></span><span class="label">Reminders</span><span class="count">5</span></div>
+            </div>
+            <div class="sb-group">
+              <div class="sb-group-label">Spaces</div>
+              <div class="sb-item"><span class="dot" style="background:var(--space-chem)"></span><span class="label">Chemistry</span><span class="count">3</span></div>
+              <div class="sb-item"><span class="dot" style="background:var(--space-calc)"></span><span class="label">AP Calculus</span><span class="count">2</span></div>
+              <div class="sb-item"><span class="dot" style="background:var(--space-debate)"></span><span class="label">Debate</span><span class="count">1</span></div>
+              <div class="sb-item"><span class="dot" style="background:var(--space-personal)"></span><span class="label">Personal</span><span class="count">2</span></div>
+              <div class="sb-item"><span class="dot" style="background:var(--space-general)"></span><span class="label">General</span><span class="count">4</span></div>
+            </div>
+          </aside>
+
+          <main class="mac-content">
+            <div class="mac-content-toolbar">
+              <div class="ctb-left">
+                <div class="ctb-title">Today · Friday, July 17</div>
+                <div class="mac-segmented">
+                  <button class="active">Today</button>
+                  <button>Week</button>
+                  <button>Month</button>
+                </div>
+              </div>
+              <div class="ctb-right">
+                <button class="mac-toolbar-btn-mini" title="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></button>
+                <button class="mac-toolbar-btn-mini" title="Sync now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-15-6.7L3 8M3 12a9 9 0 0 0 15 6.7l3-2.7M3 3v5h5M21 21v-5h-5"/></svg></button>
+                <button class="mac-toolbar-btn-mini" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg></button>
+              </div>
+            </div>
+            <div class="mac-scroll">
+              <div class="capture" style="max-width: 720px; margin-bottom: 20px;">
+                <span class="capture-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span>
+                <input placeholder='Quick capture · natural language — try "Math hw tomorrow 8pm"' />
+                <button class="capture-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg></button>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; align-items: start;">
+                <div>
+                  <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--label-secondary); margin-bottom: 8px; padding: 0 4px;">Schedule · Today</div>
+                  <div class="mac-timeline">
+                    <div class="mac-tl-row">
+                      <div class="mac-tl-time">10:00 AM</div>
+                      <div class="mac-tl-content">
+                        <div class="mac-tl-block chem"><div class="title">Chemistry Lab</div><div class="sub">Stoichiometry · Room 202 · 1h 15m</div></div>
+                      </div>
+                    </div>
+                    <div class="mac-tl-row">
+                      <div class="mac-tl-time">11:00 AM</div>
+                      <div class="mac-tl-content"></div>
+                    </div>
+                    <div class="mac-tl-row">
+                      <div class="mac-tl-time">12:00 PM</div>
+                      <div class="mac-tl-content"></div>
+                    </div>
+                    <div class="mac-tl-row">
+                      <div class="mac-tl-time">1:00 PM</div>
+                      <div class="mac-tl-content">
+                        <div class="mac-tl-block calc"><div class="title">AP Calculus AB</div><div class="sub">Limits worksheet · Room 300 · 1h 15m</div></div>
+                      </div>
+                    </div>
+                    <div class="mac-tl-row">
+                      <div class="mac-tl-time">2:00 PM</div>
+                      <div class="mac-tl-content"></div>
+                    </div>
+                    <div class="mac-tl-row">
+                      <div class="mac-tl-time">3:00 PM</div>
+                      <div class="mac-tl-content"></div>
+                    </div>
+                    <div class="mac-tl-row">
+                      <div class="mac-tl-time">3:30 PM</div>
+                      <div class="mac-tl-content">
+                        <div class="mac-tl-block debate"><div class="title">Debate Practice</div><div class="sub">Court case prep · Room 110 · 1h 30m</div></div>
+                      </div>
+                    </div>
+                    <div class="mac-tl-row">
+                      <div class="mac-tl-time">4:00 PM</div>
+                      <div class="mac-tl-content"></div>
+                    </div>
+                    <div class="mac-tl-row">
+                      <div class="mac-tl-time">5:00 PM</div>
+                      <div class="mac-tl-content"></div>
+                    </div>
+                    <div class="mac-tl-row">
+                      <div class="mac-tl-time">6:00 PM</div>
+                      <div class="mac-tl-content"></div>
+                    </div>
+                    <div class="mac-tl-row">
+                      <div class="mac-tl-time">7:00 PM</div>
+                      <div class="mac-tl-content">
+                        <div class="mac-tl-block" style="background: var(--space-personal);"><div class="title">Read Chapter 4</div><div class="sub">Biology · Personal</div></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--label-secondary); margin-bottom: 8px; padding: 0 4px;">Due Today · 4</div>
+                  <div class="grouped">
+                    <div class="row">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title">Stoichiometry problem set</div><div class="row-sub"><span style="color:var(--space-chem);font-weight:600">●</span> Chemistry · 5:00 PM</div></div>
+                    </div>
+                    <div class="row">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title">Limits worksheet</div><div class="row-sub"><span style="color:var(--space-calc);font-weight:600">●</span> AP Calculus · 7:00 PM</div></div>
+                    </div>
+                    <div class="row">
+                      <button class="checkbox checked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title" style="text-decoration: line-through; color: var(--label-tertiary);">Court case prep outline</div><div class="row-sub"><span style="color:var(--space-debate);font-weight:600">●</span> Debate · 11:59 PM</div></div>
+                    </div>
+                    <div class="row">
+                      <button class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
+                      <div class="row-text"><div class="row-title">Read Chapter 4</div><div class="row-sub"><span style="color:var(--space-personal);font-weight:600">●</span> Personal · 9:30 PM</div></div>
+                    </div>
+                  </div>
+
+                  <div style="margin-top: 16px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--label-secondary); margin-bottom: 8px; padding: 0 4px;">Pomodoro</div>
+                  <div class="grouped" style="padding: 16px; text-align: center;">
+                    <div style="font-size: 36px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin-bottom: 6px;">25:00</div>
+                    <div style="font-size: 12px; color: var(--label-secondary); margin-bottom: 12px;">Focus session · Chemistry problem set</div>
+                    <div style="display: flex; gap: 8px; justify-content: center;">
+                      <button style="appearance: none; border: 0; background: var(--tint); color: white; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 18px; border-radius: 6px; cursor: pointer;">Start</button>
+                      <button style="appearance: none; border: 0.5px solid var(--separator); background: transparent; color: var(--label-primary); font: inherit; font-size: 13px; font-weight: 500; padding: 6px 18px; border-radius: 6px; cursor: pointer;">Skip</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+
+          <aside class="mac-command">
+            <div class="mac-command-header">
+              <div class="mac-command-title">Command Hub</div>
+              <button class="mac-toolbar-btn-mini"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            </div>
+            <div class="mac-command-tabs">
+              <div class="mac-command-tab active">Today</div>
+              <div class="mac-command-tab">All</div>
+              <div class="mac-command-tab">Search</div>
+            </div>
+            <div class="mac-command-body">
+              <input class="cmd-input" value="/today" />
+              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--label-secondary); margin: 12px 4px 6px;">Today · 4 tasks</div>
+              <div class="cmd-item selected">
+                <div class="ti">Stoichiometry problem set</div>
+                <div class="si"><span style="color:var(--space-chem);font-weight:600">●</span> Chemistry · Today 5:00 PM</div>
+                <div class="meta">
+                  <span class="pill" style="font-size:10px;padding:2px 6px;">Schedule</span>
+                  <span class="pill" style="font-size:10px;padding:2px 6px;">Open note</span>
+                  <span class="pill" style="font-size:10px;padding:2px 6px;background:var(--success);color:white;">Complete</span>
+                </div>
+              </div>
+              <div class="cmd-item">
+                <div class="ti">Limits worksheet</div>
+                <div class="si"><span style="color:var(--space-calc);font-weight:600">●</span> AP Calculus · Today 7:00 PM</div>
+              </div>
+              <div class="cmd-item" style="opacity: 0.55;">
+                <div class="ti" style="text-decoration: line-through;">Court case prep outline</div>
+                <div class="si"><span style="color:var(--space-debate);font-weight:600">●</span> Debate · Today 11:59 PM</div>
+              </div>
+              <div class="cmd-item">
+                <div class="ti">Read Chapter 4</div>
+                <div class="si"><span style="color:var(--space-personal);font-weight:600">●</span> Personal · Today 9:30 PM</div>
+              </div>
+              <div style="margin-top: 12px; padding: 10px; background: var(--bg-grouped); border-radius: 8px; font-size: 12px; color: var(--label-secondary); line-height: 1.5;">
+                💡 Try: <span style="color: var(--tint);">move Court case prep to 4 pm</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== DESIGN NOTES ===================== -->
+  <div class="design-notes">
+    <h2>One design system · three idioms</h2>
+    <p>The three platforms share <strong>tokens</strong> (colors, typography, spacing, radius, shadows) and <strong>components</strong> (cards, rows, pills, timeline blocks, sync indicator, quick capture). What changes is <strong>how those components are arranged</strong> — the layout idiom each platform expects from users.</p>
+
+    <div class="grid">
+      <div class="item">
+        <strong>iPhone</strong>
+        <p style="font-size: 13px; margin-top: 4px;">5-tab bottom TabBar for one-handed reach. Each tab = own <code>NavigationStack</code>. Native <code>List(.insetGrouped)</code> with <code>.swipeActions</code> and <code>.searchable</code>. FAB for quick add. Sheet inspectors with detents.</p>
+      </div>
+      <div class="item">
+        <strong>iPad</strong>
+        <p style="font-size: 13px; margin-top: 4px;"><code>NavigationSplitView</code> with persistent sidebar (264pt) and main content. Two-column card grid for the Today dashboard. Sidebar items show count badges and Space color dots. Same swipe actions on lists.</p>
+      </div>
+      <div class="item">
+        <strong>Mac</strong>
+        <p style="font-size: 13px; margin-top: 4px;">Existing 3-pane: sidebar (244pt) + content + Command Hub (360pt). Refined toolbar with segmented control, sync status, and quick capture. The Command Hub pattern from v0.1 stays because Mac users love it.</p>
+      </div>
+    </div>
+
+    <h3>Shared design tokens</h3>
+    <div class="grid">
+      <div class="item">
+        <strong>Primary</strong>
+        <div class="swatches">
+          <div class="swatch"><span class="dot" style="background:#1F6EEA"></span> Hub Accent</div>
+        </div>
+      </div>
+      <div class="item">
+        <strong>Spaces</strong>
+        <div class="swatches">
+          <div class="swatch"><span class="dot" style="background:#428CFA"></span> AP Calc</div>
+          <div class="swatch"><span class="dot" style="background:#F5B824"></span> Chemistry</div>
+          <div class="swatch"><span class="dot" style="background:#33BDC7"></span> Debate</div>
+          <div class="swatch"><span class="dot" style="background:#6EC763"></span> Personal</div>
+          <div class="swatch"><span class="dot" style="background:#8A8F98"></span> General</div>
+        </div>
+      </div>
+      <div class="item">
+        <strong>Semantic</strong>
+        <div class="swatches">
+          <div class="swatch"><span class="dot" style="background:#34C759"></span> Success</div>
+          <div class="swatch"><span class="dot" style="background:#FF9500"></span> Warning</div>
+          <div class="swatch"><span class="dot" style="background:#FF3B30"></span> Error</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Implementation strategy (SwiftUI)</h3>
+    <ul>
+      <li><strong>Conditional shell</strong> — a single <code>AppShellView</code> branches on <code>UIDevice.current.userInterfaceIdiom</code>: <code>.phone</code> uses the new <code>IPhoneShellView</code> (TabView), <code>.pad</code> uses the new <code>IPadShellView</code> (NavigationSplitView), macOS uses the existing 3-pane <code>AppShellView</code> with the toolbar/sync refinements.</li>
+      <li><strong>Shared view model</strong> — <code>AppState</code>, <code>HubTask</code>, <code>HubNote</code>, <code>ScheduleBlock</code>, <code>Course</code>, and <code>CloudSyncService</code> are reused unchanged. <code>CloudSyncService</code> already syncs across Mac/iPhone/iPad via the user's private iCloud database.</li>
+      <li><strong>Per-platform views</strong> — each platform gets its own SwiftUI files under <code>StudentHub/Views/IPhone/</code>, <code>IPad/</code>, and existing macOS paths. They compose shared components from <code>HubComponents.swift</code> (new file: HubPageHeader, SyncStatusPill, QuickCaptureField, ScheduleBlockCard, etc.).</li>
+      <li><strong>Zero data-layer risk</strong> — <code>WorkspaceStorage</code> and <code>CloudSyncService</code> are untouched. The redesign is purely additive at the view layer.</li>
+    </ul>
+
+    <h3>Files to add (on the feature branch)</h3>
+    <ul>
+      <li><code>StudentHub/Theme/HubComponents.swift</code> — shared SwiftUI components (SyncStatusPill, QuickCaptureField, TimelineBlock, MoreCard, etc.)</li>
+      <li><code>StudentHub/Views/IPhone/IPhoneShellView.swift</code> — TabView shell</li>
+      <li><code>StudentHub/Views/IPhone/TodayView.swift</code> — Today dashboard</li>
+      <li><code>StudentHub/Views/IPhone/TasksView.swift</code> — task list with swipe actions</li>
+      <li><code>StudentHub/Views/IPhone/CalendarView.swift</code> — week + day timeline</li>
+      <li><code>StudentHub/Views/IPhone/NotesView.swift</code> — notes list</li>
+      <li><code>StudentHub/Views/IPhone/MoreView.swift</code> — more grid</li>
+      <li><code>StudentHub/Views/IPad/IPadShellView.swift</code> — NavigationSplitView shell</li>
+      <li><code>StudentHub/Views/IPad/TodayView.swift</code>, <code>TasksView.swift</code>, etc. — 2-col variants</li>
+      <li>Refinements to <code>AppShellView.swift</code> for macOS (toolbar sync pill, quick capture, segmented control) — kept minimal to avoid disrupting Mac users</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  function setTheme(theme) {
+    document.body.dataset.theme = theme;
+    document.getElementById('themeLight').classList.toggle('active', theme === 'light');
+    document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
+  }
+</script>
+
+</body>
+</html>
