@@ -25,20 +25,37 @@ struct IPadNotesView: View {
     var body: some View {
         HStack(spacing: 0) {
             // Folder list
-            List(selection: $selectedFolder) {
+            List {
                 Section("All") {
-                    Label("All Notes", systemImage: "tray.full")
-                        .tag(String?.none)
+                    Button {
+                        selectedFolder = nil
+                    } label: {
+                        Label("All Notes", systemImage: "tray.full")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(
+                        selectedFolder == nil ? HubPalette.hubAccent.opacity(0.12) : Color.clear
+                    )
                 }
                 Section("Folders") {
                     ForEach(folders, id: \.self) { folder in
                         let count = appState.notes.filter { $0.folder == folder }.count
-                        HStack {
-                            Label(folder, systemImage: "folder")
-                            Spacer()
-                            Text("\(count)").foregroundStyle(HubPalette.tertiaryText)
+                        Button {
+                            selectedFolder = folder
+                        } label: {
+                            HStack {
+                                Label(folder, systemImage: "folder")
+                                Spacer()
+                                Text("\(count)").foregroundStyle(HubPalette.tertiaryText)
+                            }
+                            .contentShape(Rectangle())
                         }
-                        .tag(String?.some(folder))
+                        .buttonStyle(.plain)
+                        .listRowBackground(
+                            selectedFolder == folder ? HubPalette.hubAccent.opacity(0.12) : Color.clear
+                        )
                     }
                 }
             }

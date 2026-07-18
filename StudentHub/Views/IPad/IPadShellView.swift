@@ -19,11 +19,35 @@ struct IPadShellView: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         SyncStatusPill()
                     }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            appState.isQuickCommandPresented = true
+                        } label: {
+                            Image(systemName: "command")
+                        }
+                        .accessibilityLabel("Open Command Hub")
+                    }
                     #endif
                 }
         }
         .navigationSplitViewStyle(.balanced)
         .tint(HubPalette.hubAccent)
+        .onChange(of: selectedSection) { _, new in
+            if new == .spaceHome, appState.selectedSpaceID == nil {
+                appState.selectedSpaceID = appState.spaces.first?.id
+            }
+            // Mirror selection into appState so WorkspaceContentView can pick it up.
+            appState.selectedSection = new
+        }
+        .onChange(of: appState.selectedSection) { _, new in
+            if selectedSection != new { selectedSection = new }
+        }
+        .sheet(isPresented: $appState.isQuickCommandPresented) {
+            QuickCommandView(onDismiss: { appState.isQuickCommandPresented = false })
+                .environmentObject(appState)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
     }
 }
 
@@ -41,6 +65,7 @@ struct IPadDetailView: View {
         case .calendar: IPhoneCalendarView()
         case .notes: IPadNotesView()
         case .projects, .files, .journal, .meetings, .reminders, .pomodoro, .export: IPadMoreView(section: section)
+        case .spaceHome: SpaceWorkspaceView()
         }
     }
 }

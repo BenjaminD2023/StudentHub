@@ -129,11 +129,7 @@ struct IPhoneTaskInspectorView: View {
             }
             .navigationTitle("Task")
             #if os(iOS)
-            #if os(iOS)
-
             .navigationBarTitleDisplayMode(.inline)
-
-            #endif
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

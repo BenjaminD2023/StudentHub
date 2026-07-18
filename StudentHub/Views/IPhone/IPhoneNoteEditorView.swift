@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Bottom-sheet note editor with title, folder, space, and a
-/// monospaced Markdown body.
+/// Bottom-sheet note editor with title, folder, space, and an
+/// Obsidian-style live Markdown canvas.
 struct IPhoneNoteEditorView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
@@ -9,6 +9,7 @@ struct IPhoneNoteEditorView: View {
     let noteID: UUID
 
     @State private var draft: HubNote?
+    @State private var autosaveTask: Task<Void, Never>?
 
     private var note: HubNote? { appState.notes.first(where: { $0.id == noteID }) }
 
@@ -51,16 +52,32 @@ struct IPhoneNoteEditorView: View {
                             }
                         }
                         Section("Markdown") {
-                            TextEditor(text: Binding(
+                            ObsidianLiveMarkdownEditor(text: Binding(
                                 get: { draft.markdown },
                                 set: { newValue in
                                     var d = draft
                                     d.markdown = newValue
                                     self.draft = d
                                 }
-                            ))
-                            .font(.system(size: 14, design: .monospaced))
-                            .frame(minHeight: 280)
+                            ), targetLine: nil)
+                            .frame(minHeight: 360)
+                        }
+                        Section("Markdown tools") {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(MarkdownTool.allCases) { tool in
+                                        Button {
+                                            insert(tool)
+                                        } label: {
+                                            Label(tool.title, systemImage: tool.icon)
+                                        }
+                                        .buttonStyle(.bordered)
+                                    }
+                                }
+                            }
+                            Text("Tap a tool to insert an editable example.")
+                                .font(.caption)
+                                .foregroundStyle(HubPalette.secondaryText)
                         }
                     }
                 } else {
@@ -73,11 +90,7 @@ struct IPhoneNoteEditorView: View {
             }
             .navigationTitle("Note")
             #if os(iOS)
-            #if os(iOS)
-
             .navigationBarTitleDisplayMode(.inline)
-
-            #endif
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -97,8 +110,32 @@ struct IPhoneNoteEditorView: View {
             .onChange(of: noteID) { _, _ in
                 draft = note
             }
+            .onChange(of: draft) { _, newValue in
+                scheduleAutosave(newValue)
+            }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .onDisappear {
+            autosaveTask?.cancel()
+            if let draft { appState.updateNote(draft) }
+        }
+    }
+
+    private func insert(_ tool: MarkdownTool) {
+        guard var draft else { return }
+        let leadingNewline = !draft.markdown.isEmpty && !draft.markdown.hasSuffix("\n") ? "\n" : ""
+        draft.markdown += leadingNewline + tool.snippet
+        self.draft = draft
+    }
+
+    private func scheduleAutosave(_ note: HubNote?) {
+        autosaveTask?.cancel()
+        guard let note else { return }
+        autosaveTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(450))
+            guard !Task.isCancelled else { return }
+            appState.updateNote(note)
+        }
     }
 }

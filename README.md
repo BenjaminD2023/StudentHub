@@ -1,57 +1,70 @@
+<p align="center">
+  <img src="Docs/Brand/StudentHub-Logo.png" width="144" alt="Student Hub logo">
+</p>
+
 # Student Hub
 
-Student Hub is a lightweight, local-first SwiftUI study workspace for macOS, iPadOS, and iOS. v0.1 has full desktop workspaces and compact phone/tablet views built from the same data model.
+Student Hub is a lightweight, local-first study workspace for macOS, iPhone, and iPad. It brings tasks, schedules, projects, Markdown notes, files, journals, meetings, and focus timers into one connected SwiftUI app.
 
-## Included in v0.1
+![macOS workspace](Design/final-runtime-audit.png)
 
-- Colored day timeline plus a drag-to-select calendar and task drop scheduling
-- Task inbox, full task editor, due dates, Space filters, project links, note links, and subtasks
-- User-defined Spaces that can be created, renamed, recolored, or deleted with linked content safely reassigned
-- Projects with deadlines, progress, task lists, and meeting records
-- Markdown notes with folders, multiple open tabs, preview, task linking, and Finder access
-- Journal entries and local reminders
-- File import, in-app PDF preview, annotation notes, and PDF free-text annotations
-- Meeting transcripts, editable summaries, and `TODO:` / `- [ ]` action extraction
-- Pomodoro timer linked to a task
-- CSV and Markdown task/project export
-- Universal scratchpad captures that can be converted into tasks or notes
-- Detailed Command Hub plus a global macOS Quick Command panel (`Option-Space`)
-- System, Light, and Dark appearance modes
-- Atomic JSON persistence; Markdown, imported files, and exports are ordinary user-accessible files
-- Optional private-iCloud sync for the workspace and imported library files
+## Highlights
 
-## Build
+- **Quick Command:** press `Option-Space` on macOS, or tap the command button on iPhone/iPad, to capture, search, schedule, and run actions.
+- **Natural dates:** understands input such as `Math homework tomorrow 8pm`, `next Tue`, `Jul 22`, `7月20日`, and `下周三下午4点`.
+- **Focus commands:** use `start pomo`, `start 25 minute countdown`, or `start timer` for a Pomodoro, custom countdown, or count-up stopwatch.
+- **Connected workspace:** tasks can link to calendar blocks, projects, notes, subtasks, meetings, and colored Spaces.
+- **Obsidian-style Markdown:** notes render inside the editor; only the line being edited reveals its Markdown syntax. Notes also have folders, quick navigation, multiple desktop tabs/windows, and a touch-friendly Markdown tool strip.
+- **Spaces:** create, rename, recolor, open, and directly delete Spaces together with their assigned content.
+- **Files and PDFs:** import files, open them quickly, preview PDFs, and keep annotation notes/free-text PDF annotations.
+- **Journal and meetings:** dated calendar entries, undated memos, transcripts, editable summaries, and action-item extraction.
+- **Portable output:** share tasks and projects as CSV or Markdown on every platform.
+- **Native appearance:** responsive Mac/iPhone/iPad layouts with System, Light, and Dark modes.
 
-Open `StudentHub.xcodeproj` in Xcode 26 and run the `StudentHub` scheme. The macOS build can also be verified with:
+![Quick Command](Design/first-usable-quick-command.png)
+
+## Requirements
+
+- Xcode 26 or newer
+- macOS 14 or newer
+- iOS/iPadOS 17 or newer
+
+No third-party runtime dependencies are required.
+
+## Build from source
+
+Open `StudentHub.xcodeproj`, select the `StudentHub` scheme, and run it on My Mac, an iPhone/iPad simulator, or a connected device.
+
+For a real iPhone or iPad, open the StudentHub target's **Signing & Capabilities** tab and select your Apple Development team. Xcode can then create a personal provisioning profile for your device.
+
+Command-line verification:
 
 ```sh
 xcodebuild -project StudentHub.xcodeproj \
   -scheme StudentHub \
   -configuration Debug \
-  -destination 'platform=macOS' build
+  -destination 'platform=macOS' \
+  CODE_SIGNING_ALLOWED=NO test
 ```
 
-Run the core tests with:
+## Data and privacy
 
-```sh
-xcodebuild -project StudentHub.xcodeproj \
-  -scheme StudentHub \
-  -configuration Debug \
-  -destination 'platform=macOS' test
-```
-
-This Mac currently has the iOS SDK but not the complete iOS platform component, so the iPhone/iPad destination cannot be built here until it is installed from Xcode Settings → Components.
-
-## Data locations
+Student Hub is local-first and has no analytics or advertising.
 
 - Workspace database: `~/Library/Application Support/StudentHub/workspace.json`
-- Markdown and user files: `~/Documents/Student Hub Library/`
-- Exports: `~/Documents/Student Hub Library/Exports/`
+- Markdown, imported files, and exports: `~/Documents/Student Hub Library/`
+- Reset: use **Settings → Reset Student Hub** to return to a clean workspace.
 
-The first launch includes sample school data so every workflow can be tried immediately.
+Optional private CloudKit synchronization is implemented but disabled in the public build until a developer configures their own iCloud container and entitlements. See [SyncArchitecture.md](Docs/SyncArchitecture.md).
 
-## Optional multi-device sync
+## macOS download
 
-Local mode is the default, so the packaged Mac app works without an Apple Developer account. The app also includes an opt-in CloudKit implementation using the user's private database. To activate it, select an Apple Development Team, register the iCloud container, set `STUDENT_HUB_CLOUD_ENTITLEMENTS` to `StudentHub/StudentHub.entitlements`, and set `STUDENT_HUB_CLOUD_SYNC_ENABLED` to `YES`. After installing the signed build on each device, turn on **Sync with iCloud** from the colored sidebar menu.
+The GitHub Release includes a macOS app ZIP. It is ad-hoc signed, not Apple-notarized, so macOS may ask you to confirm it the first time. If needed, Control-click Student Hub and choose **Open**. Building from source is the most transparent installation path.
 
-The implemented v0.1 model, limitations, and production checklist are in [Docs/SyncArchitecture.md](Docs/SyncArchitecture.md).
+## Contributing
+
+Issues and forks are welcome. Please keep changes focused, run the test command above, and verify affected iPhone/iPad layouts when changing shared SwiftUI views.
+
+## License
+
+Student Hub is available under the [MIT License](LICENSE).

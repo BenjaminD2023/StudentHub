@@ -320,18 +320,46 @@ struct TaskInspectorView: View {
 struct ProjectsWorkspaceView: View {
     @EnvironmentObject private var appState: AppState
     @State private var newProjectName = ""
+    @State private var newProjectCourseID = Course.general.id
+    @State private var newProjectDeadline = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
 
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 18) {
                 HubPageHeader(eyebrow: "Spaces", title: "Projects", subtitle: "Keep deadlines, notes, meetings, and subtasks together.")
-                HStack {
-                    TextField("New project", text: $newProjectName)
-                        .textFieldStyle(.plain)
-                        .onSubmit(addProject)
-                    Button("Create", action: addProject)
-                        .buttonStyle(HubProminentButtonStyle())
-                        .disabled(newProjectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                VStack(spacing: 10) {
+                    HStack {
+                        Image(systemName: "folder.badge.plus")
+                            .foregroundStyle(selectedProjectCourse.accent)
+                        TextField("Project name", text: $newProjectName)
+                            .textFieldStyle(.plain)
+                            .onSubmit(addProject)
+                        Button("Create project", action: addProject)
+                            .buttonStyle(HubProminentButtonStyle())
+                            .disabled(newProjectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    Divider()
+                    VStack(spacing: 8) {
+                        HStack {
+                            Text("Space")
+                                .foregroundStyle(HubPalette.secondaryText)
+                            Spacer()
+                            Picker("", selection: $newProjectCourseID) {
+                                ForEach(appState.spaces) { course in Text(course.title).tag(course.id) }
+                            }
+                            .labelsHidden()
+                            .frame(minWidth: 120, maxWidth: 180)
+                        }
+                        HStack {
+                            Text("Deadline")
+                                .foregroundStyle(HubPalette.secondaryText)
+                            Spacer()
+                            DatePicker("", selection: $newProjectDeadline, displayedComponents: [.date])
+                                .labelsHidden()
+                                .fixedSize()
+                        }
+                    }
+                    .font(.callout)
                 }
                 .padding(14)
                 .hubPanel(cornerRadius: 14)
@@ -356,6 +384,11 @@ struct ProjectsWorkspaceView: View {
             }
         }
         .background(HubPalette.background)
+        .onAppear {
+            if !appState.spaces.contains(where: { $0.id == newProjectCourseID }) {
+                newProjectCourseID = appState.defaultSpace.id
+            }
+        }
     }
 
     private func projectRow(_ project: HubProject) -> some View {
@@ -396,12 +429,16 @@ struct ProjectsWorkspaceView: View {
     private func addProject() {
         let name = newProjectName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        appState.addProject(
-            title: name,
-            course: .general,
-            deadline: Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
-        )
+        let project: HubProject = withAnimation(.easeOut(duration: 0.18)) {
+            appState.addProject(title: name, course: selectedProjectCourse, deadline: newProjectDeadline)
+        }
+        appState.statusMessage = "Created project \(project.title)"
         newProjectName = ""
+        newProjectDeadline = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+    }
+
+    private var selectedProjectCourse: Course {
+        appState.spaces.first(where: { $0.id == newProjectCourseID }) ?? appState.defaultSpace
     }
 }
 

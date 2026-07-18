@@ -23,8 +23,8 @@ struct SidebarView: View {
                 SidebarSection(title: "SPACES") {
                     ForEach(appState.spaces) { space in
                         Button {
-                            appState.taskCourseFilter = space
-                            appState.navigate(to: .tasks)
+                            appState.selectedSpaceID = space.id
+                            appState.selectedSection = .spaceHome
                         } label: {
                             HStack(spacing: 10) {
                                 RoundedRectangle(cornerRadius: 2)
@@ -121,7 +121,7 @@ struct SidebarView: View {
     }
 
     private func isSelected(_ space: Course) -> Bool {
-        appState.selectedSection == .tasks && appState.taskCourseFilter?.id == space.id
+        appState.selectedSection == .spaceHome && appState.selectedSpaceID == space.id
     }
 }
 

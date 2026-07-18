@@ -3,46 +3,49 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 71;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		B00000000000000000000001 /* StudentHubApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000001 /* StudentHubApp.swift */; };
-		B00000000000000000000002 /* HubModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000002 /* HubModels.swift */; };
-		B00000000000000000000003 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000003 /* AppState.swift */; };
-		B00000000000000000000004 /* HubTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000004 /* HubTheme.swift */; };
-		B00000000000000000000005 /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000005 /* AppShellView.swift */; };
-		B00000000000000000000006 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000006 /* SidebarView.swift */; };
-		B00000000000000000000007 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000007 /* TimelineView.swift */; };
-		B00000000000000000000008 /* CommandHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000008 /* CommandHubView.swift */; };
-		B00000000000000000000009 /* QuickCommandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000009 /* QuickCommandView.swift */; };
-		B0000000000000000000000A /* MacQuickPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000A /* MacQuickPanel.swift */; };
-		B0000000000000000000000C /* WorkspaceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000C /* WorkspaceModels.swift */; };
-		B0000000000000000000000D /* WorkspaceStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000D /* WorkspaceStorage.swift */; };
-		B0000000000000000000000E /* FileDocumentSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000E /* FileDocumentSupport.swift */; };
-		B0000000000000000000000F /* WorkspaceContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000F /* WorkspaceContentView.swift */; };
-		B00000000000000000000010 /* TasksProjectsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000010 /* TasksProjectsViews.swift */; };
-		B00000000000000000000011 /* NotesJournalViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000011 /* NotesJournalViews.swift */; };
-		B00000000000000000000012 /* FilesMeetingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000012 /* FilesMeetingsViews.swift */; };
-		B00000000000000000000013 /* UtilityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000013 /* UtilityViews.swift */; };
-		B00000000000000000000014 /* CloudSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000014 /* CloudSyncService.swift */; };
-		B00000000000000000000015 /* CompactWorkspaceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000015 /* CompactWorkspaceViews.swift */; };
+		B00000000000000000000002 /* Models/HubModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000002 /* Models/HubModels.swift */; };
+		B00000000000000000000003 /* State/AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000003 /* State/AppState.swift */; };
+		B00000000000000000000004 /* Theme/HubTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000004 /* Theme/HubTheme.swift */; };
+		B00000000000000000000005 /* Views/AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000005 /* Views/AppShellView.swift */; };
+		B00000000000000000000006 /* Views/SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000006 /* Views/SidebarView.swift */; };
+		B00000000000000000000007 /* Views/TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000007 /* Views/TimelineView.swift */; };
+		B00000000000000000000008 /* Views/CommandHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000008 /* Views/CommandHubView.swift */; };
+		B00000000000000000000009 /* Views/QuickCommandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000009 /* Views/QuickCommandView.swift */; };
+		B0000000000000000000000A /* Platform/MacQuickPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000A /* Platform/MacQuickPanel.swift */; };
+		B0000000000000000000000C /* Models/WorkspaceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000C /* Models/WorkspaceModels.swift */; };
+		B0000000000000000000000D /* State/WorkspaceStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000D /* State/WorkspaceStorage.swift */; };
+		B0000000000000000000000E /* Platform/FileDocumentSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000E /* Platform/FileDocumentSupport.swift */; };
+		B0000000000000000000000F /* Views/WorkspaceContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000F /* Views/WorkspaceContentView.swift */; };
+		B00000000000000000000010 /* Views/TasksProjectsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000010 /* Views/TasksProjectsViews.swift */; };
+		B00000000000000000000011 /* Views/NotesJournalViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000011 /* Views/NotesJournalViews.swift */; };
+		B00000000000000000000012 /* Views/FilesMeetingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000012 /* Views/FilesMeetingsViews.swift */; };
+		B00000000000000000000013 /* Views/UtilityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000013 /* Views/UtilityViews.swift */; };
+		B00000000000000000000014 /* State/CloudSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000014 /* State/CloudSyncService.swift */; };
+		B00000000000000000000015 /* Views/CompactWorkspaceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000015 /* Views/CompactWorkspaceViews.swift */; };
 		B00000000000000000000016 /* StudentHubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000016 /* StudentHubTests.swift */; };
-		B00000000000000000000060 /* HubComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000060 /* HubComponents.swift */; };
-		B00000000000000000000061 /* IPhoneShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000061 /* IPhoneShellView.swift */; };
-		B00000000000000000000062 /* IPhoneTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000062 /* IPhoneTodayView.swift */; };
-		B00000000000000000000063 /* IPhoneTasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000063 /* IPhoneTasksView.swift */; };
-		B00000000000000000000064 /* IPhoneCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000064 /* IPhoneCalendarView.swift */; };
-		B00000000000000000000065 /* IPhoneNotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000065 /* IPhoneNotesView.swift */; };
-		B00000000000000000000066 /* IPhoneMoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000066 /* IPhoneMoreView.swift */; };
-		B00000000000000000000067 /* IPhoneTaskInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000067 /* IPhoneTaskInspectorView.swift */; };
-		B00000000000000000000068 /* IPhoneNoteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000068 /* IPhoneNoteEditorView.swift */; };
-		B00000000000000000000069 /* IPadShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000069 /* IPadShellView.swift */; };
-		B0000000000000000000006A /* IPadSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000006A /* IPadSidebar.swift */; };
-		B0000000000000000000006B /* IPadTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000006B /* IPadTodayView.swift */; };
-		B0000000000000000000006C /* IPadTasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000006C /* IPadTasksView.swift */; };
-		B0000000000000000000006D /* IPadNotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000006D /* IPadNotesView.swift */; };
-		B0000000000000000000006E /* IPadMoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000006E /* IPadMoreView.swift */; };
+		B00000000000000000000060 /* Theme/HubComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000060 /* Theme/HubComponents.swift */; };
+		B00000000000000000000061 /* Views/IPhone/IPhoneShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000061 /* Views/IPhone/IPhoneShellView.swift */; };
+		B00000000000000000000062 /* Views/IPhone/IPhoneTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000062 /* Views/IPhone/IPhoneTodayView.swift */; };
+		B00000000000000000000063 /* Views/IPhone/IPhoneTasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000063 /* Views/IPhone/IPhoneTasksView.swift */; };
+		B00000000000000000000064 /* Views/IPhone/IPhoneCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000064 /* Views/IPhone/IPhoneCalendarView.swift */; };
+		B00000000000000000000065 /* Views/IPhone/IPhoneNotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000065 /* Views/IPhone/IPhoneNotesView.swift */; };
+		B00000000000000000000066 /* Views/IPhone/IPhoneMoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000066 /* Views/IPhone/IPhoneMoreView.swift */; };
+		B00000000000000000000067 /* Views/IPhone/IPhoneTaskInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000067 /* Views/IPhone/IPhoneTaskInspectorView.swift */; };
+		B00000000000000000000068 /* Views/IPhone/IPhoneNoteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000068 /* Views/IPhone/IPhoneNoteEditorView.swift */; };
+		B00000000000000000000069 /* Views/IPad/IPadShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000069 /* Views/IPad/IPadShellView.swift */; };
+		B0000000000000000000006A /* Views/IPad/IPadSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000006A /* Views/IPad/IPadSidebar.swift */; };
+		B0000000000000000000006B /* Views/IPad/IPadTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000006B /* Views/IPad/IPadTodayView.swift */; };
+		B0000000000000000000006C /* Views/IPad/IPadTasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000006C /* Views/IPad/IPadTasksView.swift */; };
+		B0000000000000000000006D /* Views/IPad/IPadNotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000006D /* Views/IPad/IPadNotesView.swift */; };
+		B0000000000000000000006E /* Views/IPad/IPadMoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000006E /* Views/IPad/IPadMoreView.swift */; };
+		B0000000000000000000006F /* Views/SpacesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000006F /* Views/SpacesView.swift */; };
+		B00000000000000000000070 /* Views/ObsidianLiveMarkdownEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000070 /* Views/ObsidianLiveMarkdownEditor.swift */; };
+		B00000000000000000000071 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000071 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,43 +60,46 @@
 
 /* Begin PBXFileReference section */
 		F00000000000000000000001 /* StudentHubApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentHubApp.swift; sourceTree = "<group>"; };
-		F00000000000000000000002 /* HubModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/HubModels.swift; sourceTree = "<group>"; };
-		F00000000000000000000003 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = State/AppState.swift; sourceTree = "<group>"; };
-		F00000000000000000000004 /* HubTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme/HubTheme.swift; sourceTree = "<group>"; };
-		F00000000000000000000005 /* AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/AppShellView.swift; sourceTree = "<group>"; };
-		F00000000000000000000006 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/SidebarView.swift; sourceTree = "<group>"; };
-		F00000000000000000000007 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/TimelineView.swift; sourceTree = "<group>"; };
-		F00000000000000000000008 /* CommandHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/CommandHubView.swift; sourceTree = "<group>"; };
-		F00000000000000000000009 /* QuickCommandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/QuickCommandView.swift; sourceTree = "<group>"; };
-		F0000000000000000000000A /* MacQuickPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Platform/MacQuickPanel.swift; sourceTree = "<group>"; };
+		F00000000000000000000002 /* Models/HubModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/HubModels.swift; sourceTree = "<group>"; };
+		F00000000000000000000003 /* State/AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = State/AppState.swift; sourceTree = "<group>"; };
+		F00000000000000000000004 /* Theme/HubTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme/HubTheme.swift; sourceTree = "<group>"; };
+		F00000000000000000000005 /* Views/AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/AppShellView.swift; sourceTree = "<group>"; };
+		F00000000000000000000006 /* Views/SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/SidebarView.swift; sourceTree = "<group>"; };
+		F00000000000000000000007 /* Views/TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/TimelineView.swift; sourceTree = "<group>"; };
+		F00000000000000000000008 /* Views/CommandHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/CommandHubView.swift; sourceTree = "<group>"; };
+		F00000000000000000000009 /* Views/QuickCommandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/QuickCommandView.swift; sourceTree = "<group>"; };
+		F0000000000000000000000A /* Platform/MacQuickPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Platform/MacQuickPanel.swift; sourceTree = "<group>"; };
 		F0000000000000000000000B /* StudentHub.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StudentHub.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		F0000000000000000000000C /* WorkspaceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/WorkspaceModels.swift; sourceTree = "<group>"; };
-		F0000000000000000000000D /* WorkspaceStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = State/WorkspaceStorage.swift; sourceTree = "<group>"; };
-		F0000000000000000000000E /* FileDocumentSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Platform/FileDocumentSupport.swift; sourceTree = "<group>"; };
-		F0000000000000000000000F /* WorkspaceContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/WorkspaceContentView.swift; sourceTree = "<group>"; };
-		F00000000000000000000010 /* TasksProjectsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/TasksProjectsViews.swift; sourceTree = "<group>"; };
-		F00000000000000000000011 /* NotesJournalViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/NotesJournalViews.swift; sourceTree = "<group>"; };
-		F00000000000000000000012 /* FilesMeetingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/FilesMeetingsViews.swift; sourceTree = "<group>"; };
-		F00000000000000000000013 /* UtilityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/UtilityViews.swift; sourceTree = "<group>"; };
-		F00000000000000000000014 /* CloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = State/CloudSyncService.swift; sourceTree = "<group>"; };
-		F00000000000000000000015 /* CompactWorkspaceViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/CompactWorkspaceViews.swift; sourceTree = "<group>"; };
+		F0000000000000000000000C /* Models/WorkspaceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/WorkspaceModels.swift; sourceTree = "<group>"; };
+		F0000000000000000000000D /* State/WorkspaceStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = State/WorkspaceStorage.swift; sourceTree = "<group>"; };
+		F0000000000000000000000E /* Platform/FileDocumentSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Platform/FileDocumentSupport.swift; sourceTree = "<group>"; };
+		F0000000000000000000000F /* Views/WorkspaceContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/WorkspaceContentView.swift; sourceTree = "<group>"; };
+		F00000000000000000000010 /* Views/TasksProjectsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/TasksProjectsViews.swift; sourceTree = "<group>"; };
+		F00000000000000000000011 /* Views/NotesJournalViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/NotesJournalViews.swift; sourceTree = "<group>"; };
+		F00000000000000000000012 /* Views/FilesMeetingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/FilesMeetingsViews.swift; sourceTree = "<group>"; };
+		F00000000000000000000013 /* Views/UtilityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/UtilityViews.swift; sourceTree = "<group>"; };
+		F00000000000000000000014 /* State/CloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = State/CloudSyncService.swift; sourceTree = "<group>"; };
+		F00000000000000000000015 /* Views/CompactWorkspaceViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/CompactWorkspaceViews.swift; sourceTree = "<group>"; };
 		F00000000000000000000016 /* StudentHubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentHubTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000017 /* StudentHubTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StudentHubTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		F00000000000000000000060 /* HubComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme/HubComponents.swift; sourceTree = "<group>"; };
-		F00000000000000000000061 /* IPhoneShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneShellView.swift; sourceTree = "<group>"; };
-		F00000000000000000000062 /* IPhoneTodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneTodayView.swift; sourceTree = "<group>"; };
-		F00000000000000000000063 /* IPhoneTasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneTasksView.swift; sourceTree = "<group>"; };
-		F00000000000000000000064 /* IPhoneCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneCalendarView.swift; sourceTree = "<group>"; };
-		F00000000000000000000065 /* IPhoneNotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneNotesView.swift; sourceTree = "<group>"; };
-		F00000000000000000000066 /* IPhoneMoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneMoreView.swift; sourceTree = "<group>"; };
-		F00000000000000000000067 /* IPhoneTaskInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneTaskInspectorView.swift; sourceTree = "<group>"; };
-		F00000000000000000000068 /* IPhoneNoteEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneNoteEditorView.swift; sourceTree = "<group>"; };
-		F00000000000000000000069 /* IPadShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadShellView.swift; sourceTree = "<group>"; };
-		F0000000000000000000006A /* IPadSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadSidebar.swift; sourceTree = "<group>"; };
-		F0000000000000000000006B /* IPadTodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadTodayView.swift; sourceTree = "<group>"; };
-		F0000000000000000000006C /* IPadTasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadTasksView.swift; sourceTree = "<group>"; };
-		F0000000000000000000006D /* IPadNotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadNotesView.swift; sourceTree = "<group>"; };
-		F0000000000000000000006E /* IPadMoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadMoreView.swift; sourceTree = "<group>"; };
+		F00000000000000000000060 /* Theme/HubComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme/HubComponents.swift; sourceTree = "<group>"; };
+		F00000000000000000000061 /* Views/IPhone/IPhoneShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneShellView.swift; sourceTree = "<group>"; };
+		F00000000000000000000062 /* Views/IPhone/IPhoneTodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneTodayView.swift; sourceTree = "<group>"; };
+		F00000000000000000000063 /* Views/IPhone/IPhoneTasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneTasksView.swift; sourceTree = "<group>"; };
+		F00000000000000000000064 /* Views/IPhone/IPhoneCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneCalendarView.swift; sourceTree = "<group>"; };
+		F00000000000000000000065 /* Views/IPhone/IPhoneNotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneNotesView.swift; sourceTree = "<group>"; };
+		F00000000000000000000066 /* Views/IPhone/IPhoneMoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneMoreView.swift; sourceTree = "<group>"; };
+		F00000000000000000000067 /* Views/IPhone/IPhoneTaskInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneTaskInspectorView.swift; sourceTree = "<group>"; };
+		F00000000000000000000068 /* Views/IPhone/IPhoneNoteEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPhone/IPhoneNoteEditorView.swift; sourceTree = "<group>"; };
+		F00000000000000000000069 /* Views/IPad/IPadShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadShellView.swift; sourceTree = "<group>"; };
+		F0000000000000000000006A /* Views/IPad/IPadSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadSidebar.swift; sourceTree = "<group>"; };
+		F0000000000000000000006B /* Views/IPad/IPadTodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadTodayView.swift; sourceTree = "<group>"; };
+		F0000000000000000000006C /* Views/IPad/IPadTasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadTasksView.swift; sourceTree = "<group>"; };
+		F0000000000000000000006D /* Views/IPad/IPadNotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadNotesView.swift; sourceTree = "<group>"; };
+		F0000000000000000000006E /* Views/IPad/IPadMoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/IPad/IPadMoreView.swift; sourceTree = "<group>"; };
+		F0000000000000000000006F /* Views/SpacesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/SpacesView.swift; sourceTree = "<group>"; };
+		F00000000000000000000070 /* Views/ObsidianLiveMarkdownEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ObsidianLiveMarkdownEditor.swift; sourceTree = "<group>"; };
+		F00000000000000000000071 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -127,40 +133,43 @@
 			isa = PBXGroup;
 			children = (
 				F00000000000000000000001 /* StudentHubApp.swift */,
-				F00000000000000000000002 /* HubModels.swift */,
-				F00000000000000000000003 /* AppState.swift */,
-				F00000000000000000000004 /* HubTheme.swift */,
-				F00000000000000000000005 /* AppShellView.swift */,
-				F00000000000000000000006 /* SidebarView.swift */,
-				F00000000000000000000007 /* TimelineView.swift */,
-				F00000000000000000000008 /* CommandHubView.swift */,
-				F00000000000000000000009 /* QuickCommandView.swift */,
-				F0000000000000000000000A /* MacQuickPanel.swift */,
-				F0000000000000000000000C /* WorkspaceModels.swift */,
-				F0000000000000000000000D /* WorkspaceStorage.swift */,
-				F0000000000000000000000E /* FileDocumentSupport.swift */,
-				F0000000000000000000000F /* WorkspaceContentView.swift */,
-				F00000000000000000000010 /* TasksProjectsViews.swift */,
-				F00000000000000000000011 /* NotesJournalViews.swift */,
-				F00000000000000000000012 /* FilesMeetingsViews.swift */,
-				F00000000000000000000013 /* UtilityViews.swift */,
-				F00000000000000000000014 /* CloudSyncService.swift */,
-				F00000000000000000000015 /* CompactWorkspaceViews.swift */,
-				F00000000000000000000060 /* HubComponents.swift */,
-				F00000000000000000000061 /* IPhoneShellView.swift */,
-				F00000000000000000000062 /* IPhoneTodayView.swift */,
-				F00000000000000000000063 /* IPhoneTasksView.swift */,
-				F00000000000000000000064 /* IPhoneCalendarView.swift */,
-				F00000000000000000000065 /* IPhoneNotesView.swift */,
-				F00000000000000000000066 /* IPhoneMoreView.swift */,
-				F00000000000000000000067 /* IPhoneTaskInspectorView.swift */,
-				F00000000000000000000068 /* IPhoneNoteEditorView.swift */,
-				F00000000000000000000069 /* IPadShellView.swift */,
-				F0000000000000000000006A /* IPadSidebar.swift */,
-				F0000000000000000000006B /* IPadTodayView.swift */,
-				F0000000000000000000006C /* IPadTasksView.swift */,
-				F0000000000000000000006D /* IPadNotesView.swift */,
-				F0000000000000000000006E /* IPadMoreView.swift */,
+				F00000000000000000000002 /* Models/HubModels.swift */,
+				F00000000000000000000003 /* State/AppState.swift */,
+				F00000000000000000000004 /* Theme/HubTheme.swift */,
+				F00000000000000000000005 /* Views/AppShellView.swift */,
+				F00000000000000000000006 /* Views/SidebarView.swift */,
+				F00000000000000000000007 /* Views/TimelineView.swift */,
+				F00000000000000000000008 /* Views/CommandHubView.swift */,
+				F00000000000000000000009 /* Views/QuickCommandView.swift */,
+				F0000000000000000000000A /* Platform/MacQuickPanel.swift */,
+				F0000000000000000000000C /* Models/WorkspaceModels.swift */,
+				F0000000000000000000000D /* State/WorkspaceStorage.swift */,
+				F0000000000000000000000E /* Platform/FileDocumentSupport.swift */,
+				F0000000000000000000000F /* Views/WorkspaceContentView.swift */,
+				F00000000000000000000010 /* Views/TasksProjectsViews.swift */,
+				F00000000000000000000011 /* Views/NotesJournalViews.swift */,
+				F00000000000000000000012 /* Views/FilesMeetingsViews.swift */,
+				F00000000000000000000013 /* Views/UtilityViews.swift */,
+				F00000000000000000000014 /* State/CloudSyncService.swift */,
+				F00000000000000000000015 /* Views/CompactWorkspaceViews.swift */,
+				F00000000000000000000060 /* Theme/HubComponents.swift */,
+				F00000000000000000000061 /* Views/IPhone/IPhoneShellView.swift */,
+				F00000000000000000000062 /* Views/IPhone/IPhoneTodayView.swift */,
+				F00000000000000000000063 /* Views/IPhone/IPhoneTasksView.swift */,
+				F00000000000000000000064 /* Views/IPhone/IPhoneCalendarView.swift */,
+				F00000000000000000000065 /* Views/IPhone/IPhoneNotesView.swift */,
+				F00000000000000000000066 /* Views/IPhone/IPhoneMoreView.swift */,
+				F00000000000000000000067 /* Views/IPhone/IPhoneTaskInspectorView.swift */,
+				F00000000000000000000068 /* Views/IPhone/IPhoneNoteEditorView.swift */,
+				F00000000000000000000069 /* Views/IPad/IPadShellView.swift */,
+				F0000000000000000000006A /* Views/IPad/IPadSidebar.swift */,
+				F0000000000000000000006B /* Views/IPad/IPadTodayView.swift */,
+				F0000000000000000000006C /* Views/IPad/IPadTasksView.swift */,
+				F0000000000000000000006D /* Views/IPad/IPadNotesView.swift */,
+				F0000000000000000000006E /* Views/IPad/IPadMoreView.swift */,
+				F0000000000000000000006F /* Views/SpacesView.swift */,
+				F00000000000000000000070 /* Views/ObsidianLiveMarkdownEditor.swift */,
+				F00000000000000000000071 /* Assets.xcassets */,
 			);
 			path = StudentHub;
 			sourceTree = "<group>";
@@ -267,6 +276,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B00000000000000000000071 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -285,40 +295,42 @@
 			buildActionMask = 2147483647;
 			files = (
 				B00000000000000000000001 /* StudentHubApp.swift in Sources */,
-				B00000000000000000000002 /* HubModels.swift in Sources */,
-				B00000000000000000000003 /* AppState.swift in Sources */,
-				B00000000000000000000004 /* HubTheme.swift in Sources */,
-				B00000000000000000000005 /* AppShellView.swift in Sources */,
-				B00000000000000000000006 /* SidebarView.swift in Sources */,
-				B00000000000000000000007 /* TimelineView.swift in Sources */,
-				B00000000000000000000008 /* CommandHubView.swift in Sources */,
-				B00000000000000000000009 /* QuickCommandView.swift in Sources */,
-				B0000000000000000000000A /* MacQuickPanel.swift in Sources */,
-				B0000000000000000000000C /* WorkspaceModels.swift in Sources */,
-				B0000000000000000000000D /* WorkspaceStorage.swift in Sources */,
-				B0000000000000000000000E /* FileDocumentSupport.swift in Sources */,
-				B0000000000000000000000F /* WorkspaceContentView.swift in Sources */,
-				B00000000000000000000010 /* TasksProjectsViews.swift in Sources */,
-				B00000000000000000000011 /* NotesJournalViews.swift in Sources */,
-				B00000000000000000000012 /* FilesMeetingsViews.swift in Sources */,
-				B00000000000000000000013 /* UtilityViews.swift in Sources */,
-				B00000000000000000000014 /* CloudSyncService.swift in Sources */,
-				B00000000000000000000015 /* CompactWorkspaceViews.swift in Sources */,
-				B00000000000000000000060 /* HubComponents.swift in Sources */,
-				B00000000000000000000061 /* IPhoneShellView.swift in Sources */,
-				B00000000000000000000062 /* IPhoneTodayView.swift in Sources */,
-				B00000000000000000000063 /* IPhoneTasksView.swift in Sources */,
-				B00000000000000000000064 /* IPhoneCalendarView.swift in Sources */,
-				B00000000000000000000065 /* IPhoneNotesView.swift in Sources */,
-				B00000000000000000000066 /* IPhoneMoreView.swift in Sources */,
-				B00000000000000000000067 /* IPhoneTaskInspectorView.swift in Sources */,
-				B00000000000000000000068 /* IPhoneNoteEditorView.swift in Sources */,
-				B00000000000000000000069 /* IPadShellView.swift in Sources */,
-				B0000000000000000000006A /* IPadSidebar.swift in Sources */,
-				B0000000000000000000006B /* IPadTodayView.swift in Sources */,
-				B0000000000000000000006C /* IPadTasksView.swift in Sources */,
-				B0000000000000000000006D /* IPadNotesView.swift in Sources */,
-				B0000000000000000000006E /* IPadMoreView.swift in Sources */,
+				B00000000000000000000002 /* Models/HubModels.swift in Sources */,
+				B00000000000000000000003 /* State/AppState.swift in Sources */,
+				B00000000000000000000004 /* Theme/HubTheme.swift in Sources */,
+				B00000000000000000000005 /* Views/AppShellView.swift in Sources */,
+				B00000000000000000000006 /* Views/SidebarView.swift in Sources */,
+				B00000000000000000000007 /* Views/TimelineView.swift in Sources */,
+				B00000000000000000000008 /* Views/CommandHubView.swift in Sources */,
+				B00000000000000000000009 /* Views/QuickCommandView.swift in Sources */,
+				B0000000000000000000000A /* Platform/MacQuickPanel.swift in Sources */,
+				B0000000000000000000000C /* Models/WorkspaceModels.swift in Sources */,
+				B0000000000000000000000D /* State/WorkspaceStorage.swift in Sources */,
+				B0000000000000000000000E /* Platform/FileDocumentSupport.swift in Sources */,
+				B0000000000000000000000F /* Views/WorkspaceContentView.swift in Sources */,
+				B00000000000000000000010 /* Views/TasksProjectsViews.swift in Sources */,
+				B00000000000000000000011 /* Views/NotesJournalViews.swift in Sources */,
+				B00000000000000000000012 /* Views/FilesMeetingsViews.swift in Sources */,
+				B00000000000000000000013 /* Views/UtilityViews.swift in Sources */,
+				B00000000000000000000014 /* State/CloudSyncService.swift in Sources */,
+				B00000000000000000000015 /* Views/CompactWorkspaceViews.swift in Sources */,
+				B00000000000000000000060 /* Theme/HubComponents.swift in Sources */,
+				B00000000000000000000061 /* Views/IPhone/IPhoneShellView.swift in Sources */,
+				B00000000000000000000062 /* Views/IPhone/IPhoneTodayView.swift in Sources */,
+				B00000000000000000000063 /* Views/IPhone/IPhoneTasksView.swift in Sources */,
+				B00000000000000000000064 /* Views/IPhone/IPhoneCalendarView.swift in Sources */,
+				B00000000000000000000065 /* Views/IPhone/IPhoneNotesView.swift in Sources */,
+				B00000000000000000000066 /* Views/IPhone/IPhoneMoreView.swift in Sources */,
+				B00000000000000000000067 /* Views/IPhone/IPhoneTaskInspectorView.swift in Sources */,
+				B00000000000000000000068 /* Views/IPhone/IPhoneNoteEditorView.swift in Sources */,
+				B00000000000000000000069 /* Views/IPad/IPadShellView.swift in Sources */,
+				B0000000000000000000006A /* Views/IPad/IPadSidebar.swift in Sources */,
+				B0000000000000000000006B /* Views/IPad/IPadTodayView.swift in Sources */,
+				B0000000000000000000006C /* Views/IPad/IPadTasksView.swift in Sources */,
+				B0000000000000000000006D /* Views/IPad/IPadNotesView.swift in Sources */,
+				B0000000000000000000006E /* Views/IPad/IPadMoreView.swift in Sources */,
+				B0000000000000000000006F /* Views/SpacesView.swift in Sources */,
+				B00000000000000000000070 /* Views/ObsidianLiveMarkdownEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -382,18 +394,25 @@
 		A00000000000000000000042 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(STUDENT_HUB_CLOUD_ENTITLEMENTS)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 45PVRUCTSQ;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Student Hub";
+				INFOPLIST_KEY_CFBundleDisplayName = "Student Hub Debug";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -401,16 +420,16 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.benjamin.StudentHub;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.benjamin.StudentHub.Debug;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
+				STUDENT_HUB_CLOUD_SYNC_ENABLED = NO;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) STUDENT_HUB_CLOUD_SYNC_$(STUDENT_HUB_CLOUD_SYNC_ENABLED)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				STUDENT_HUB_CLOUD_SYNC_ENABLED = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -418,10 +437,13 @@
 		A00000000000000000000043 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(STUDENT_HUB_CLOUD_ENTITLEMENTS)";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 45PVRUCTSQ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -430,6 +452,8 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -437,16 +461,16 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.benjamin.StudentHub;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
+				STUDENT_HUB_CLOUD_SYNC_ENABLED = NO;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) STUDENT_HUB_CLOUD_SYNC_$(STUDENT_HUB_CLOUD_SYNC_ENABLED)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				STUDENT_HUB_CLOUD_SYNC_ENABLED = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -458,6 +482,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 45PVRUCTSQ;
 				ENABLE_HARDENED_RUNTIME = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -479,6 +504,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 45PVRUCTSQ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

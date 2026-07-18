@@ -16,6 +16,7 @@ struct IPadMoreView: View {
         case .reminders: RemindersWorkspaceView()
         case .pomodoro: PomodoroWorkspaceView()
         case .export: ExportWorkspaceView()
+        case .spaceHome: SpaceWorkspaceView()
         default: EmptyStateView(systemImage: "questionmark", title: "Not available", message: "Pick another section from the sidebar.")
         }
     }

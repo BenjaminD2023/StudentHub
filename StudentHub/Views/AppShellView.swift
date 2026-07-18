@@ -36,6 +36,11 @@ private struct MacAppShellView: View {
             let showsSidebar = width >= 820
             let showsCommandHub = width >= 1120 && appState.isCommandHubVisible
             let isNarrow = width < 600
+            let commandHubWidth: CGFloat = switch appState.selectedSection {
+            case .today: min(680, max(580, width * 0.44))
+            case .notes: min(400, max(360, width * 0.26))
+            default: min(520, max(460, width * 0.34))
+            }
 
             VStack(spacing: 0) {
                 HubTopBar(
@@ -73,7 +78,7 @@ private struct MacAppShellView: View {
                     if showsCommandHub {
                         Divider()
                         CommandHubView(onClose: appState.toggleCommandHub)
-                            .frame(width: min(520, width * 0.40))
+                            .frame(width: commandHubWidth)
                             .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }

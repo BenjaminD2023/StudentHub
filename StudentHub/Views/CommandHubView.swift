@@ -18,6 +18,10 @@ struct CommandHubView: View {
         CommandHint(command: "add Chem lab report tomorrow 7:30 pm", detail: "Create a dated task", icon: "calendar.badge.plus"),
         CommandHint(command: "move Court case prep to Friday 4 pm", detail: "Find and reschedule a task", icon: "arrow.right.circle"),
         CommandHint(command: "/capture Ask Ms. Li about sources", detail: "Save an unprocessed thought", icon: "square.and.pencil"),
+        CommandHint(command: "/project Research fair Jul 31", detail: "Create a project with a deadline", icon: "folder.badge.plus"),
+        CommandHint(command: "/note Debate evidence", detail: "Create and open a Markdown note", icon: "doc.badge.plus"),
+        CommandHint(command: "start 25 minute countdown", detail: "Start a focus countdown", icon: "timer"),
+        CommandHint(command: "start timer", detail: "Start a stopwatch from zero", icon: "stopwatch"),
         CommandHint(command: "/notes", detail: "Open the notes workspace", icon: "doc.text")
     ]
 
@@ -111,23 +115,32 @@ struct CommandHubView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            Text("Command Hub")
-                .font(.title2.bold())
-            Spacer()
-            Picker("Scope", selection: $scope) {
-                ForEach(Scope.allCases) { scope in
-                    Text(scope.rawValue).tag(scope)
+        VStack(spacing: 10) {
+            HStack {
+                Text("Command Hub")
+                    .font(.title2.bold())
+                    .lineLimit(1)
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
                 }
+                .buttonStyle(.plain)
+                .help("Close Command Hub")
             }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 230)
-
-            Button(action: onClose) {
-                Image(systemName: "xmark")
+            HStack(spacing: 10) {
+                Text("Scope")
+                    .font(.callout)
+                    .fixedSize()
+                Picker("", selection: $scope) {
+                    ForEach(Scope.allCases) { scope in
+                        Text(scope.rawValue).tag(scope)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 230)
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
-            .help("Close Command Hub")
         }
         .padding(16)
     }
@@ -210,7 +223,7 @@ struct CommandHubView: View {
                             .background(HubPalette.selected)
                             .clipShape(Capsule())
                     }
-                    if interpretation.draft.recognizedTokens.isEmpty {
+                    if interpretation.draft.recognizedTokens.isEmpty, interpretation.intent.usesDate {
                         Text("No date found — defaults to today at 7:30 pm")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -219,10 +232,12 @@ struct CommandHubView: View {
                 }
                 if case .rescheduleTask(let query) = interpretation.intent {
                     let match = appState.tasks.first { $0.title.localizedCaseInsensitiveContains(query) }
-                    Text(match == nil ? "No existing task matches “\(query)” yet." : "Matched: \(match!.title) → \(interpretation.draft.dueDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))")
+                    Text(match.map {
+                        "Matched: \($0.title) → \(interpretation.draft.dueDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))"
+                    } ?? "No existing task matches “\(query)” yet.")
                         .font(.caption)
                         .foregroundStyle(match == nil ? HubPalette.red : HubPalette.secondaryText)
-                } else {
+                } else if interpretation.intent.usesDate {
                     Text("Due \(interpretation.draft.dueDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))")
                         .font(.caption)
                         .foregroundStyle(HubPalette.secondaryText)
@@ -260,43 +275,57 @@ struct CommandHubView: View {
         case "/files": appState.navigate(to: .files)
         case "/meetings": appState.navigate(to: .meetings)
         case "/reminders": appState.navigate(to: .reminders)
-        case "/pomo", "/pomodoro": appState.navigate(to: .pomodoro)
+        case "/pomo", "/pomodoro":
+            appState.startFocusTimer(.countdown(seconds: 25 * 60))
+            appState.navigate(to: .pomodoro)
         case "/export": appState.navigate(to: .export)
         default:
-            if trimmed.lowercased().hasPrefix("/capture ") {
-                appState.addCapture(String(trimmed.dropFirst(9)))
+            let interpretation = CommandInterpreter.interpret(trimmed, spaces: appState.spaces)
+            switch interpretation.intent {
+            case .createTask:
+                appState.createTask(from: interpretation.draft)
+                appState.statusMessage = "Created \(interpretation.draft.title)"
                 command = ""
-            } else if trimmed.lowercased().hasPrefix("/note ") {
-                let title = String(trimmed.dropFirst(6))
-                appState.addNote(title: title, folder: "Command Hub")
-                appState.navigate(to: .notes)
-            } else if trimmed.lowercased().hasPrefix("/project ") {
-                let title = String(trimmed.dropFirst(9))
-                appState.addProject(
-                    title: title,
-                    course: .general,
-                    deadline: Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+                scope = .today
+            case .capture(let text):
+                guard !text.isEmpty else {
+                    appState.statusMessage = "Type something after /capture"
+                    return
+                }
+                appState.addCapture(text)
+                command = ""
+            case .createProject:
+                let deadline = interpretation.draft.recognizedTokens.contains(where: { $0.kind == .date })
+                    ? interpretation.draft.dueDate
+                    : (Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date())
+                let project = appState.addProject(
+                    title: interpretation.draft.title == "Untitled task" ? "Untitled project" : interpretation.draft.title,
+                    course: interpretation.draft.course,
+                    deadline: deadline
                 )
+                appState.statusMessage = "Created project \(project.title)"
                 appState.navigate(to: .projects)
-            } else {
-                let interpretation = CommandInterpreter.interpret(trimmed, spaces: appState.spaces)
-                switch interpretation.intent {
-                case .createTask:
-                    appState.createTask(from: interpretation.draft)
-                    appState.statusMessage = "Created \(interpretation.draft.title)"
+                command = ""
+            case .createNote:
+                let title = interpretation.draft.title == "Untitled task" ? "Untitled note" : interpretation.draft.title
+                let note = appState.addNote(title: title, folder: interpretation.draft.course.title, course: interpretation.draft.course)
+                appState.openNote(note.id)
+                appState.navigate(to: .notes)
+                command = ""
+            case .rescheduleTask(let query):
+                if let task = appState.rescheduleTask(matching: query, to: interpretation.draft.dueDate) {
+                    appState.statusMessage = "Moved \(task.title) to \(interpretation.draft.dueDate.formatted(date: .abbreviated, time: .shortened))"
                     command = ""
                     scope = .today
-                case .rescheduleTask(let query):
-                    if let task = appState.rescheduleTask(matching: query, to: interpretation.draft.dueDate) {
-                        appState.statusMessage = "Moved \(task.title) to \(interpretation.draft.dueDate.formatted(date: .abbreviated, time: .shortened))"
-                        command = ""
-                        scope = .today
-                    } else {
-                        appState.statusMessage = "No task matched “\(query)”"
-                    }
-                case .search:
-                    scope = .search
+                } else {
+                    appState.statusMessage = "No task matched “\(query)”"
                 }
+            case .search:
+                scope = .search
+            case .startTimer(let timer):
+                appState.startFocusTimer(timer)
+                appState.navigate(to: .pomodoro)
+                command = ""
             }
         }
     }
@@ -310,8 +339,22 @@ struct CommandHubView: View {
     private func intentIcon(_ intent: CommandIntent) -> String {
         switch intent {
         case .createTask: "checkmark.square"
+        case .capture: "square.and.pencil"
+        case .createProject: "folder.badge.plus"
+        case .createNote: "doc.badge.plus"
         case .rescheduleTask: "calendar.badge.clock"
         case .search: "magnifyingglass"
+        case .startTimer(.countdown): "timer"
+        case .startTimer(.stopwatch): "stopwatch"
+        }
+    }
+}
+
+private extension CommandIntent {
+    var usesDate: Bool {
+        switch self {
+        case .createTask, .createProject, .rescheduleTask: true
+        case .capture, .createNote, .search, .startTimer: false
         }
     }
 }
@@ -439,30 +482,41 @@ private struct TaskDetail: View {
                     .foregroundStyle(.tint)
             }
 
-            HStack(spacing: 10) {
-                Button("Schedule", systemImage: "calendar.badge.plus") {
-                    appState.schedule(task.id, at: 16)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    taskActions
                 }
-                .buttonStyle(HubProminentButtonStyle())
-
-                Button("Open note", systemImage: "doc.text") {
-                    guard let noteID = task.linkedNoteID else { return }
-                    appState.openNote(noteID)
-                    appState.navigate(to: .notes)
+                VStack(alignment: .leading, spacing: 8) {
+                    taskActions
                 }
-                    .buttonStyle(.bordered)
-                    .disabled(task.linkedNoteID == nil)
-
-                Button("Complete", systemImage: "checkmark.circle") {
-                    appState.toggleComplete(task.id)
-                }
-                .buttonStyle(.bordered)
             }
             .controlSize(.small)
         }
-        .padding(.horizontal, 56)
+        .padding(.leading, 36)
+        .padding(.trailing, 16)
         .padding(.vertical, 14)
         .background(Color.accentColor.opacity(0.07))
+    }
+
+    @ViewBuilder
+    private var taskActions: some View {
+        Button("Schedule", systemImage: "calendar.badge.plus") {
+            appState.schedule(task.id, at: 16)
+        }
+        .buttonStyle(HubProminentButtonStyle())
+
+        Button("Open note", systemImage: "doc.text") {
+            guard let noteID = task.linkedNoteID else { return }
+            appState.openNote(noteID)
+            appState.navigate(to: .notes)
+        }
+        .buttonStyle(.bordered)
+        .disabled(task.linkedNoteID == nil)
+
+        Button("Complete", systemImage: "checkmark.circle") {
+            appState.toggleComplete(task.id)
+        }
+        .buttonStyle(.bordered)
     }
 
     private func detailLine(icon: String, text: String) -> some View {

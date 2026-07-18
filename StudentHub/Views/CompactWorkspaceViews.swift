@@ -18,7 +18,8 @@ struct CompactWorkspaceContentView: View {
             case .meetings: CompactMeetingsView()
             case .reminders: CompactRemindersView()
             case .pomodoro: PomodoroWorkspaceView()
-            case .export: ExportWorkspaceView()
+            case .export: CompactExportView()
+            case .spaceHome: SpaceWorkspaceView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -229,6 +230,7 @@ private struct CompactNoteEditor: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var draft: HubNote
+    @State private var showsPreview = true
 
     init(note: HubNote) { _draft = State(initialValue: note) }
 
@@ -244,9 +246,24 @@ private struct CompactNoteEditor: View {
                 }
                 TextEditor(text: $draft.markdown)
                     .font(.system(size: 14, design: .monospaced))
+                    .frame(minHeight: 240)
                     .padding(8)
                     .background(HubPalette.grouped)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(MarkdownTool.allCases) { tool in
+                            Button { insert(tool) } label: { Label(tool.title, systemImage: tool.icon) }
+                                .buttonStyle(.bordered)
+                        }
+                    }
+                }
+                DisclosureGroup("Live Markdown preview", isExpanded: $showsPreview) {
+                    MarkdownReadingView(source: draft.markdown, targetLine: nil)
+                        .frame(minHeight: 220)
+                        .background(HubPalette.grouped)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
             }
             .padding()
             .background(HubPalette.background)
@@ -265,6 +282,11 @@ private struct CompactNoteEditor: View {
                 }
             }
         }
+    }
+
+    private func insert(_ tool: MarkdownTool) {
+        let leadingNewline = !draft.markdown.isEmpty && !draft.markdown.hasSuffix("\n") ? "\n" : ""
+        draft.markdown += leadingNewline + tool.snippet
     }
 }
 
@@ -376,17 +398,24 @@ private struct CompactJournalView: View {
                 HStack(alignment: .bottom) {
                     HubPageHeader(eyebrow: "Reflect", title: "Journal", subtitle: "Private daily reflections, saved locally first.")
                     Spacer()
-                    Button {
-                        editingEntryID = appState.addJournalEntry().id
+                    Menu {
+                        Button("Dated entry", systemImage: "calendar.badge.plus") {
+                            editingEntryID = appState.addJournalEntry().id
+                        }
+                        Button("Undated memo", systemImage: "note.text.badge.plus") {
+                            editingEntryID = appState.addJournalMemo().id
+                        }
                     } label: { Image(systemName: "plus") }
-                    .buttonStyle(HubProminentButtonStyle())
+                        .buttonStyle(HubProminentButtonStyle())
                 }
                 ForEach(appState.journalEntries.sorted { $0.date > $1.date }) { entry in
                     Button { editingEntryID = entry.id } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(entry.title).font(.system(size: 14, weight: .semibold))
-                                Text(entry.date.formatted(date: .long, time: .omitted)).font(.caption).foregroundStyle(.secondary)
+                                Text(entry.isDateLinked ? entry.date.formatted(date: .long, time: .omitted) : "Undated memo")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                             Spacer()
                             Text(String(repeating: "●", count: entry.mood)).foregroundStyle(HubPalette.yellow)
@@ -423,13 +452,19 @@ private struct CompactJournalEditor: View {
         NavigationStack {
             VStack(spacing: 12) {
                 TextField("Title", text: $draft.title).font(.title2.bold()).textFieldStyle(.roundedBorder)
+                Toggle("Linked to date", isOn: $draft.isDateLinked)
+                if draft.isDateLinked {
+                    DatePicker("Date", selection: $draft.date, displayedComponents: .date)
+                }
                 Picker("Mood", selection: $draft.mood) {
                     ForEach(1...5, id: \.self) { Text("Mood \($0)").tag($0) }
                 }
                 TextEditor(text: $draft.body)
                     .padding(8).background(HubPalette.grouped).clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .padding().background(HubPalette.background).navigationTitle(draft.date.formatted(date: .abbreviated, time: .omitted))
+            .padding()
+            .background(HubPalette.background)
+            .navigationTitle(draft.isDateLinked ? draft.date.formatted(date: .abbreviated, time: .omitted) : "Memo")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { appState.updateJournal(draft); dismiss() } }
@@ -558,6 +593,51 @@ private struct CompactRemindersView: View {
                         Spacer()
                     }
                     .padding(13).hubPanel(cornerRadius: 12)
+                }
+            }
+            .padding(18)
+        }
+        .background(HubPalette.background)
+    }
+}
+
+private struct CompactExportView: View {
+    @EnvironmentObject private var appState: AppState
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HubPageHeader(
+                    eyebrow: "Output",
+                    title: "Export workspace",
+                    subtitle: "Create portable CSV and Markdown files for assignments, printing, or archiving."
+                )
+                Button {
+                    appState.exportWorkspace()
+                } label: {
+                    Label("Export CSV + Markdown", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(HubProminentButtonStyle())
+                .controlSize(.large)
+
+                if !appState.lastExportURLs.isEmpty {
+                    HubSectionTitle(title: "Latest export")
+                    ForEach(appState.lastExportURLs, id: \.self) { url in
+                        HStack(spacing: 12) {
+                            Image(systemName: "doc")
+                            Text(url.lastPathComponent)
+                                .font(.callout.weight(.medium))
+                                .lineLimit(1)
+                            Spacer()
+                            ShareLink(item: url) {
+                                Image(systemName: "square.and.arrow.up")
+                            }
+                            .accessibilityLabel("Share \(url.lastPathComponent)")
+                        }
+                        .padding(14)
+                        .hubPanel(cornerRadius: 12)
+                    }
                 }
             }
             .padding(18)

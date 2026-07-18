@@ -13,6 +13,7 @@ enum HubSection: String, CaseIterable, Codable, Identifiable {
     case reminders
     case pomodoro
     case export
+    case spaceHome
 
     var id: String { rawValue }
 
@@ -30,6 +31,7 @@ enum HubSection: String, CaseIterable, Codable, Identifiable {
         case .reminders: "Reminders"
         case .pomodoro: "Pomodoro"
         case .export: "Export"
+        case .spaceHome: "Space"
         }
     }
 
@@ -47,6 +49,7 @@ enum HubSection: String, CaseIterable, Codable, Identifiable {
         case .reminders: "bell"
         case .pomodoro: "timer"
         case .export: "square.and.arrow.up"
+        case .spaceHome: "rectangle.3.group.fill"
         }
     }
 }
@@ -113,13 +116,36 @@ struct JournalEntry: Identifiable, Hashable, Codable {
     var title: String
     var body: String
     var mood: Int
+    var isDateLinked: Bool
 
-    init(id: UUID = UUID(), date: Date = Date(), title: String, body: String = "", mood: Int = 3) {
+    init(
+        id: UUID = UUID(),
+        date: Date = Date(),
+        title: String,
+        body: String = "",
+        mood: Int = 3,
+        isDateLinked: Bool = true
+    ) {
         self.id = id
         self.date = date
         self.title = title
         self.body = body
         self.mood = mood
+        self.isDateLinked = isDateLinked
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, date, title, body, mood, isDateLinked
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        date = try container.decode(Date.self, forKey: .date)
+        title = try container.decode(String.self, forKey: .title)
+        body = try container.decode(String.self, forKey: .body)
+        mood = try container.decode(Int.self, forKey: .mood)
+        isDateLinked = try container.decodeIfPresent(Bool.self, forKey: .isDateLinked) ?? true
     }
 }
 
@@ -230,6 +256,29 @@ struct WhiteboardCapture: Identifiable, Hashable, Codable {
     }
 }
 
+enum FocusTimerMode: String, Codable {
+    case countdown
+    case stopwatch
+}
+
+struct FocusTimerSnapshot: Codable, Equatable {
+    var mode: FocusTimerMode
+    var isRunning: Bool
+    var countdownRemaining: Int
+    var countdownEndDate: Date?
+    var stopwatchElapsed: Int
+    var stopwatchStartedAt: Date?
+
+    static let idlePomodoro = FocusTimerSnapshot(
+        mode: .countdown,
+        isRunning: false,
+        countdownRemaining: 25 * 60,
+        countdownEndDate: nil,
+        stopwatchElapsed: 0,
+        stopwatchStartedAt: nil
+    )
+}
+
 struct WorkspaceSnapshot: Codable {
     var modifiedAt: Date
     var spaces: [Course]
@@ -242,6 +291,7 @@ struct WorkspaceSnapshot: Codable {
     var reminders: [HubReminder]
     var files: [HubFileItem]
     var captures: [WhiteboardCapture]
+    var focusTimer: FocusTimerSnapshot?
 
     init(
         modifiedAt: Date = Date(),
@@ -254,7 +304,8 @@ struct WorkspaceSnapshot: Codable {
         meetings: [MeetingRecord],
         reminders: [HubReminder],
         files: [HubFileItem],
-        captures: [WhiteboardCapture]
+        captures: [WhiteboardCapture],
+        focusTimer: FocusTimerSnapshot? = nil
     ) {
         self.modifiedAt = modifiedAt
         self.spaces = spaces
@@ -267,6 +318,7 @@ struct WorkspaceSnapshot: Codable {
         self.reminders = reminders
         self.files = files
         self.captures = captures
+        self.focusTimer = focusTimer
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -281,6 +333,7 @@ struct WorkspaceSnapshot: Codable {
         case reminders
         case files
         case captures
+        case focusTimer
     }
 
     init(from decoder: Decoder) throws {
@@ -296,5 +349,6 @@ struct WorkspaceSnapshot: Codable {
         reminders = try container.decode([HubReminder].self, forKey: .reminders)
         files = try container.decode([HubFileItem].self, forKey: .files)
         captures = try container.decode([WhiteboardCapture].self, forKey: .captures)
+        focusTimer = try container.decodeIfPresent(FocusTimerSnapshot.self, forKey: .focusTimer)
     }
 }

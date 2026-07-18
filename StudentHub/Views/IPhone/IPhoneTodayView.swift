@@ -67,6 +67,14 @@ struct IPhoneTodayView: View {
             .toolbar {
                 #if os(iOS)
                 ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        appState.isQuickCommandPresented = true
+                    } label: {
+                        Image(systemName: "command")
+                    }
+                    .accessibilityLabel("Open Command Hub")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Picker("Appearance", selection: $appState.appearance) {
                             ForEach(AppearanceMode.allCases) { mode in
@@ -187,6 +195,7 @@ struct IPhoneTodayView: View {
                 QuickActionTile(icon: "square.and.pencil", tint: HubPalette.hubAccent, title: "Note") {
                     let note = appState.addNote()
                     appState.selectedNoteID = note.id
+                    appState.navigate(to: .notes)
                 }
                 QuickActionTile(icon: "bell.badge", tint: HubPalette.yellow, title: "Reminder") {
                     appState.addReminder(title: "New reminder", dueDate: Date().addingTimeInterval(3600))

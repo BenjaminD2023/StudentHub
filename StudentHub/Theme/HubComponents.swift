@@ -124,8 +124,35 @@ struct QuickCaptureField: View {
             calendar: .current,
             spaces: appState.spaces
         )
-        appState.createTask(from: interpretation.draft)
-        appState.statusMessage = interpretation.summary
+        switch interpretation.intent {
+        case .createTask:
+            appState.createTask(from: interpretation.draft)
+        case .capture(let capture):
+            guard !capture.isEmpty else { return }
+            appState.addCapture(capture)
+        case .createProject:
+            let deadline = interpretation.draft.recognizedTokens.contains(where: { $0.kind == .date })
+                ? interpretation.draft.dueDate
+                : (Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date())
+            _ = appState.addProject(title: interpretation.draft.title, course: interpretation.draft.course, deadline: deadline)
+            appState.navigate(to: .projects)
+        case .createNote:
+            let note = appState.addNote(title: interpretation.draft.title, folder: interpretation.draft.course.title, course: interpretation.draft.course)
+            appState.openNote(note.id)
+            appState.navigate(to: .notes)
+        case .rescheduleTask(let query):
+            guard appState.rescheduleTask(matching: query, to: interpretation.draft.dueDate) != nil else {
+                appState.statusMessage = "No task matched “\(query)”"
+                return
+            }
+        case .search(let query):
+            appState.statusMessage = "Open Tasks to search for “\(query)”"
+            appState.navigate(to: .tasks)
+        case .startTimer(let timer):
+            appState.startFocusTimer(timer)
+            appState.navigate(to: .pomodoro)
+        }
+        if case .startTimer = interpretation.intent { } else { appState.statusMessage = interpretation.summary }
         text = ""
         isFocused = false
         onCommit?(trimmed)
@@ -227,7 +254,6 @@ struct TaskChecklistRow: View {
     }
 
     private var dueLabel: String {
-        let now = Date()
         let calendar = Calendar.current
         if calendar.isDateInToday(task.dueDate) {
             return "Today · \(task.dueTimeLabel)"

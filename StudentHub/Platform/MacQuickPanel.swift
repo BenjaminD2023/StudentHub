@@ -5,6 +5,7 @@ import SwiftUI
 
 extension Notification.Name {
     static let toggleQuickPanel = Notification.Name("StudentHub.toggleQuickPanel")
+    static let quickPanelWillOpen = Notification.Name("StudentHub.quickPanelWillOpen")
 }
 
 @MainActor
@@ -49,8 +50,8 @@ final class QuickPanelController {
 
     init(appState: AppState) {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 780, height: 390),
-            styleMask: [.titled, .fullSizeContentView, .utilityWindow],
+            contentRect: NSRect(x: 0, y: 0, width: 820, height: 500),
+            styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -58,9 +59,10 @@ final class QuickPanelController {
 
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
+        panel.titlebarSeparatorStyle = .none
         panel.isMovableByWindowBackground = true
         panel.isReleasedWhenClosed = false
-        panel.hidesOnDeactivate = false
+        panel.hidesOnDeactivate = true
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.backgroundColor = .clear
@@ -83,6 +85,7 @@ final class QuickPanelController {
         if panel.isVisible {
             panel.orderOut(nil)
         } else {
+            NotificationCenter.default.post(name: .quickPanelWillOpen, object: nil)
             panel.center()
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)

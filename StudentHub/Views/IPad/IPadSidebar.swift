@@ -7,44 +7,55 @@ struct IPadSidebar: View {
     @Binding var selected: HubSection
 
     var body: some View {
-        List(selection: $selected) {
+        List {
             Section {
-                Label("Today", systemImage: "sun.max").tag(HubSection.today)
-                Label("Inbox", systemImage: "tray").tag(HubSection.inbox)
+                navigationRow("Today", systemImage: "sun.max", section: .today)
+                navigationRow("Inbox", systemImage: "tray", section: .inbox)
             } header: { Text("Now") }
 
             Section {
-                Label("All Tasks", systemImage: "checkmark.circle")
-                    .tag(HubSection.tasks)
-                Label("Calendar", systemImage: "calendar")
-                    .tag(HubSection.calendar)
-                Label("Projects", systemImage: "folder")
-                    .tag(HubSection.projects)
-                Label("Pomodoro", systemImage: "timer")
-                    .tag(HubSection.pomodoro)
+                navigationRow("All Tasks", systemImage: "checkmark.circle", section: .tasks)
+                navigationRow("Calendar", systemImage: "calendar", section: .calendar)
+                navigationRow("Projects", systemImage: "folder", section: .projects)
+                navigationRow("Pomodoro", systemImage: "timer", section: .pomodoro)
             } header: { Text("Plan") }
 
             Section {
-                Label("Notes", systemImage: "doc.text").tag(HubSection.notes)
-                Label("Files & PDFs", systemImage: "doc").tag(HubSection.files)
-                Label("Journal", systemImage: "book").tag(HubSection.journal)
-                Label("Meetings", systemImage: "person.3").tag(HubSection.meetings)
-                Label("Reminders", systemImage: "bell").tag(HubSection.reminders)
+                navigationRow("Notes", systemImage: "doc.text", section: .notes)
+                navigationRow("Files & PDFs", systemImage: "doc", section: .files)
+                navigationRow("Journal", systemImage: "book", section: .journal)
+                navigationRow("Meetings", systemImage: "person.3", section: .meetings)
+                navigationRow("Reminders", systemImage: "bell", section: .reminders)
             } header: { Text("Library") }
 
-            Section {
+            Section("Spaces") {
                 ForEach(appState.spaces) { space in
-                    HStack {
-                        Circle().fill(space.accent).frame(width: 8, height: 8)
-                        Text(space.title)
+                    Button {
+                        appState.selectedSpaceID = space.id
+                        selected = .spaceHome
+                    } label: {
+                        HStack {
+                            Circle().fill(space.accent).frame(width: 8, height: 8)
+                            Text(space.title)
+                            Spacer()
+                            if appState.selectedSpaceID == space.id && selected == .spaceHome {
+                                Image(systemName: "checkmark")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(HubPalette.hubAccent)
+                            }
+                        }
                     }
-                    .tag(HubSection.tasks)
+                    .buttonStyle(.plain)
+                    .listRowBackground(
+                        appState.selectedSpaceID == space.id && selected == .spaceHome
+                            ? HubPalette.hubAccent.opacity(0.12)
+                            : Color.clear
+                    )
                 }
-            } header: { Text("Spaces") }
+            }
 
             Section {
-                Label("Export", systemImage: "square.and.arrow.up")
-                    .tag(HubSection.export)
+                navigationRow("Export", systemImage: "square.and.arrow.up", section: .export)
             } header: { Text("Output") }
         }
         .listStyle(.sidebar)
@@ -58,5 +69,23 @@ struct IPadSidebar: View {
             .padding(.vertical, 8)
             .background(.bar)
         }
+    }
+
+    private func navigationRow(
+        _ title: String,
+        systemImage: String,
+        section: HubSection
+    ) -> some View {
+        Button {
+            selected = section
+        } label: {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(
+            selected == section ? HubPalette.hubAccent.opacity(0.12) : Color.clear
+        )
     }
 }

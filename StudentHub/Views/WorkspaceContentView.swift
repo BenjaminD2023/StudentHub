@@ -30,6 +30,8 @@ struct WorkspaceContentView: View {
                 PomodoroWorkspaceView()
             case .export:
                 ExportWorkspaceView()
+            case .spaceHome:
+                SpaceWorkspaceView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

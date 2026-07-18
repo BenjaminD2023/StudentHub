@@ -43,14 +43,19 @@ struct IPhoneNotesView: View {
                 Section("Folders") {
                     ForEach(folders, id: \.self) { folder in
                         let count = appState.notes.filter { $0.folder == folder }.count
-                        HStack {
-                            Image(systemName: "folder")
-                                .foregroundStyle(HubPalette.hubAccent)
-                                .frame(width: 24)
-                            Text(folder)
-                            Spacer()
-                            Text("\(count)")
-                                .foregroundStyle(HubPalette.tertiaryText)
+                        NavigationLink {
+                            AllNotesList(notes: appState.notes.filter { $0.folder == folder }.sorted { $0.modifiedAt > $1.modifiedAt })
+                                .navigationTitle(folder)
+                        } label: {
+                            HStack {
+                                Image(systemName: "folder")
+                                    .foregroundStyle(HubPalette.hubAccent)
+                                    .frame(width: 24)
+                                Text(folder)
+                                Spacer()
+                                Text("\(count)")
+                                    .foregroundStyle(HubPalette.tertiaryText)
+                            }
                         }
                     }
                 }

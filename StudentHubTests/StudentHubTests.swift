@@ -72,6 +72,52 @@ final class StudentHubTests: XCTestCase {
         XCTAssertEqual(calendar.component(.hour, from: result.draft.dueDate), 16)
     }
 
+    func testCommandInterpreterRecognizesCaptureProjectAndNoteCommands() {
+        let capture = CommandInterpreter.interpret("/capture Ask Ms. Li about sources")
+        let project = CommandInterpreter.interpret("/project History presentation next Friday")
+        let note = CommandInterpreter.interpret("/note Debate evidence")
+
+        XCTAssertEqual(capture.intent, .capture(text: "Ask Ms. Li about sources"))
+        XCTAssertEqual(capture.draft.title, "Ask Ms. Li about sources")
+        XCTAssertEqual(project.intent, .createProject)
+        XCTAssertEqual(project.draft.title, "History presentation")
+        XCTAssertEqual(note.intent, .createNote)
+        XCTAssertEqual(note.draft.title, "Debate evidence")
+    }
+
+    func testCommandInterpreterRecognizesFocusTimerCommands() {
+        XCTAssertEqual(
+            CommandInterpreter.interpret("start pomo").intent,
+            .startTimer(.countdown(seconds: 25 * 60))
+        )
+        XCTAssertEqual(
+            CommandInterpreter.interpret("start 25 minute countdown").intent,
+            .startTimer(.countdown(seconds: 25 * 60))
+        )
+        XCTAssertEqual(
+            CommandInterpreter.interpret("start 90 second countdown").intent,
+            .startTimer(.countdown(seconds: 90))
+        )
+        XCTAssertEqual(
+            CommandInterpreter.interpret("start timer").intent,
+            .startTimer(.stopwatch)
+        )
+    }
+
+    @MainActor
+    func testProjectCreationTrimsInputAndSelectsCreatedProject() throws {
+        let state = AppState(seedData: false, persistenceEnabled: false)
+        let writing = try XCTUnwrap(state.addSpace(title: "Writing", colorHex: 0xA978F2))
+
+        let project = state.addProject(title: "  Research portfolio  ", course: writing, deadline: Date(), details: "  Sources  ")
+
+        XCTAssertEqual(project.title, "Research portfolio")
+        XCTAssertEqual(project.details, "Sources")
+        XCTAssertEqual(project.course, writing)
+        XCTAssertEqual(state.projects.first?.id, project.id)
+        XCTAssertEqual(state.selectedProjectID, project.id)
+    }
+
     func testQuickCommandRecognizesNamedMonthAndRelativeOffset() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Shanghai"))
@@ -231,5 +277,27 @@ final class StudentHubTests: XCTestCase {
         XCTAssertEqual(decoded.modifiedAt, Date.distantPast)
         XCTAssertEqual(decoded.spaces, Course.allCases)
         XCTAssertTrue(decoded.tasks.isEmpty)
+    }
+
+    func testLegacyJournalEntryDefaultsToDated() throws {
+        let entry = JournalEntry(title: "Legacy entry")
+        let encoded = try JSONEncoder().encode(entry)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object.removeValue(forKey: "isDateLinked")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let decoded = try JSONDecoder().decode(JournalEntry.self, from: legacyData)
+
+        XCTAssertTrue(decoded.isDateLinked)
+    }
+
+    func testUndatedJournalMemoRoundTrips() throws {
+        let memo = JournalEntry(title: "Ideas", body: "Unsorted thoughts", isDateLinked: false)
+
+        let decoded = try JSONDecoder().decode(JournalEntry.self, from: JSONEncoder().encode(memo))
+
+        XCTAssertFalse(decoded.isDateLinked)
+        XCTAssertEqual(decoded.title, "Ideas")
+        XCTAssertEqual(decoded.body, "Unsorted thoughts")
     }
 }

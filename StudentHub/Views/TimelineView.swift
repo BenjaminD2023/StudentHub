@@ -1,65 +1,428 @@
 import SwiftUI
 
+/// Today (home page). Calendar-centric layout: month grid at the
+/// top, week strip + day timeline below, and quick action cards on
+/// the side. Designed to be the user's daily launchpad.
 struct DayTimelineView: View {
     @EnvironmentObject private var appState: AppState
     @State private var selectedDate = Date()
-    private let rowHeight: CGFloat = 64
+    @State private var displayedMonth: Date = Calendar.current.startOfDay(for: Date())
+
+    private let rowHeight: CGFloat = 56
+
+    private var today: Date { Calendar.current.startOfDay(for: Date()) }
+
+    private var monthDays: [Date] {
+        let calendar = Calendar.current
+        guard let interval = calendar.dateInterval(of: .month, for: displayedMonth) else { return [] }
+        let firstOfMonth = interval.start
+        let weekday = calendar.component(.weekday, from: firstOfMonth) - calendar.firstWeekday
+        let normalized = (weekday + 7) % 7
+        let gridStart = calendar.date(byAdding: .day, value: -normalized, to: firstOfMonth) ?? firstOfMonth
+        return (0..<42).compactMap { calendar.date(byAdding: .day, value: $0, to: gridStart) }
+    }
+
+    private var weekDays: [Date] {
+        let calendar = Calendar.current
+        let start = calendar.dateInterval(of: .weekOfYear, for: selectedDate)?.start ?? selectedDate
+        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+    }
+
+    private var dayBlocks: [ScheduleBlock] {
+        appState.scheduleBlocks
+            .filter { Calendar.current.isDate($0.date, inSameDayAs: selectedDate) }
+            .sorted { $0.startHour < $1.startHour }
+    }
+
+    private var todayBlocks: [ScheduleBlock] {
+        appState.scheduleBlocks.filter { Calendar.current.isDateInToday($0.date) }
+    }
+
+    private var tasksDueToday: [HubTask] {
+        let calendar = Calendar.current
+        return appState.tasks
+            .filter { !$0.isCompleted && calendar.isDateInToday($0.dueDate) }
+            .sorted { $0.dueDate < $1.dueDate }
+    }
+
+    private var upcomingTasks: [HubTask] {
+        let now = Date()
+        return appState.tasks
+            .filter { !$0.isCompleted && $0.dueDate > now }
+            .sorted { $0.dueDate < $1.dueDate }
+            .prefix(5)
+            .map { $0 }
+    }
+
+    private var overdueTasks: [HubTask] {
+        appState.tasks
+            .filter { $0.isOverdue }
+            .sorted { $0.dueDate < $1.dueDate }
+            .prefix(3)
+            .map { $0 }
+    }
+
+    private var blocksByDate: [Date: [ScheduleBlock]] {
+        let calendar = Calendar.current
+        var result: [Date: [ScheduleBlock]] = [:]
+        for block in appState.scheduleBlocks {
+            let day = calendar.startOfDay(for: block.date)
+            result[day, default: []].append(block)
+        }
+        return result
+    }
+
+    private var taskCountsByDate: [Date: Int] {
+        let calendar = Calendar.current
+        var result: [Date: Int] = [:]
+        for task in appState.tasks where !task.isCompleted {
+            let day = calendar.startOfDay(for: task.dueDate)
+            result[day, default: 0] += 1
+        }
+        return result
+    }
+
+    private var positionedBlocks: [PositionedBlock] {
+        let sorted = dayBlocks
+        var groups: [[ScheduleBlock]] = []
+        for block in sorted {
+            if var last = groups.last, let lastBlock = last.last,
+               abs(block.startHour - lastBlock.startHour) < 0.001 {
+                last.append(block)
+                groups[groups.count - 1] = last
+            } else {
+                groups.append([block])
+            }
+        }
+        var result: [PositionedBlock] = []
+        for group in groups {
+            let count = group.count
+            for (index, block) in group.enumerated() {
+                result.append(PositionedBlock(block: block, column: index, columnCount: count))
+            }
+        }
+        return result
+    }
 
     private struct PositionedBlock: Identifiable {
         let block: ScheduleBlock
         let column: Int
         let columnCount: Int
-
         var id: UUID { block.id }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            timelineHeader
-            Divider()
-
             ScrollView {
-                VStack(spacing: 14) {
-                    ZStack(alignment: .topLeading) {
-                        hourGrid
-                        scheduleBlocks
-                        currentTimeLine
+                VStack(alignment: .leading, spacing: 22) {
+                    homeHeader
+                    homeStatRow
+                    monthCalendar
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: 18) {
+                            dayTimelineColumn
+                                .frame(minWidth: 420, maxWidth: .infinity)
+                            rightRail
+                                .frame(width: 300)
+                        }
+                        VStack(alignment: .leading, spacing: 18) {
+                            dayTimelineColumn
+                            rightRail
+                                .frame(maxWidth: .infinity)
+                        }
                     }
-                    .frame(height: rowHeight * 13)
-
-                    dropTarget
                 }
-                .padding(.bottom, 18)
+                .padding(.horizontal, 24)
+                .padding(.top, 22)
+                .padding(.bottom, 28)
             }
         }
         .background(HubPalette.background)
     }
 
-    private var timelineHeader: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(selectedDate.formatted(.dateTime.weekday(.wide).day()))
-                        .font(.system(size: 30, weight: .bold))
-                    Text(selectedDate.formatted(.dateTime.month(.wide).year()))
+    // MARK: - Header
+
+    private var homeHeader: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(greeting)
+                    .font(.system(size: 12, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(.secondary)
+                Text(today.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                    .font(.system(size: 32, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            Spacer()
+            HStack(spacing: 10) {
+                Button {
+                    let task = appState.addTask(title: "New task")
+                    appState.selectedTaskID = task.id
+                } label: { Label("New task", systemImage: "plus") }
+                    .buttonStyle(.borderedProminent)
+                Button {
+                    let block = ScheduleBlock(
+                        title: "Focus block",
+                        subtitle: "Chemistry",
+                        course: .general,
+                        startHour: 9,
+                        duration: 1,
+                        date: today
+                    )
+                    appState.scheduleBlocks.append(block)
+                    appState.persist()
+                } label: { Label("Add block", systemImage: "calendar.badge.plus") }
+                    .buttonStyle(.bordered)
+                Menu {
+                    Button("Today") { selectedDate = today; displayedMonth = today }
+                    Divider()
+                    Button("Open calendar") { appState.navigate(to: .calendar) }
+                    Button("Open Command Hub") { appState.isCommandHubVisible = true }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+        }
+    }
+
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 4..<12: return "GOOD MORNING"
+        case 12..<18: return "GOOD AFTERNOON"
+        case 18..<22: return "GOOD EVENING"
+        default: return "GOOD NIGHT"
+        }
+    }
+
+    // MARK: - Stat row
+
+    private var homeStatRow: some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 140), spacing: 12)],
+            alignment: .leading,
+            spacing: 12
+        ) {
+            statTile(
+                icon: "checkmark.square.fill",
+                tint: HubPalette.hubAccent,
+                value: "\(tasksDueToday.count)",
+                label: "Due today"
+            )
+            statTile(
+                icon: "exclamationmark.triangle.fill",
+                tint: HubPalette.red,
+                value: "\(overdueTasks.count)",
+                label: "Overdue"
+            )
+            statTile(
+                icon: "clock.fill",
+                tint: HubPalette.yellow,
+                value: "\(todayBlocks.count)",
+                label: "On calendar"
+            )
+            statTile(
+                icon: "doc.text.fill",
+                tint: Color(red: 0.55, green: 0.4, blue: 0.85),
+                value: "\(appState.captures.count)",
+                label: "Captures"
+            )
+            statTile(
+                icon: "folder.fill",
+                tint: HubPalette.success,
+                value: "\(appState.tasks.filter { !$0.isCompleted }.count)",
+                label: "All open"
+            )
+        }
+    }
+
+    private func statTile(icon: String, tint: Color, value: String, label: String) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(tint.opacity(0.16))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .foregroundStyle(tint)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(value)
+                    .font(.system(size: 20, weight: .bold))
+                    .monospacedDigit()
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(HubPalette.grouped)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(HubPalette.separator, lineWidth: 0.5)
+        )
+    }
+
+    // MARK: - Month calendar
+
+    private var monthCalendar: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(displayedMonth.formatted(.dateTime.month(.wide).year()))
+                    .font(.system(size: 18, weight: .semibold))
+                Spacer()
+                HStack(spacing: 4) {
+                    Button {
+                        if let m = Calendar.current.date(byAdding: .month, value: -1, to: displayedMonth) {
+                            displayedMonth = m
+                        }
+                    } label: { Image(systemName: "chevron.left") }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    Button("Today") { displayedMonth = today; selectedDate = today }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    Button {
+                        if let m = Calendar.current.date(byAdding: .month, value: 1, to: displayedMonth) {
+                            displayedMonth = m
+                        }
+                    } label: { Image(systemName: "chevron.right") }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
+            }
+            HStack(spacing: 4) {
+                ForEach(weekdaySymbols, id: \.self) { sym in
+                    Text(sym)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
+                ForEach(monthDays, id: \.self) { day in
+                    monthDayCell(day)
+                }
+            }
+        }
+        .padding(18)
+        .background(HubPalette.grouped)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(HubPalette.separator, lineWidth: 0.5)
+        )
+    }
+
+    private var weekdaySymbols: [String] {
+        let symbols = Calendar.current.veryShortWeekdaySymbols
+        let start = Calendar.current.firstWeekday - 1
+        return (0..<7).map { symbols[(start + $0) % 7] }
+    }
+
+    private func monthDayCell(_ day: Date) -> some View {
+        let calendar = Calendar.current
+        let inMonth = calendar.isDate(day, equalTo: displayedMonth, toGranularity: .month)
+        let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
+        let isToday = calendar.isDate(day, inSameDayAs: today)
+        let blockCount = blocksByDate[calendar.startOfDay(for: day)]?.count ?? 0
+        let taskCount = taskCountsByDate[calendar.startOfDay(for: day)] ?? 0
+        let hasItems = blockCount > 0 || taskCount > 0
+        return Button {
+            selectedDate = day
+        } label: {
+            VStack(spacing: 3) {
+                Text("\(calendar.component(.day, from: day))")
+                    .font(.system(size: 13, weight: isToday || isSelected ? .bold : .regular))
+                if hasItems {
+                    HStack(spacing: 2) {
+                        if blockCount > 0 {
+                            Circle().fill(HubPalette.hubAccent).frame(width: 4, height: 4)
+                        }
+                        if taskCount > 0 {
+                            Circle().fill(HubPalette.yellow).frame(width: 4, height: 4)
+                        }
+                    }
+                } else {
+                    Spacer().frame(height: 4)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? HubPalette.hubAccent : (isToday ? HubPalette.hubAccent.opacity(0.10) : Color.clear))
+            )
+            .foregroundStyle(
+                isSelected ? Color.white
+                : (inMonth ? HubPalette.primaryText : HubPalette.tertiaryText)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Day timeline
+
+    private var dayTimelineColumn: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(selectedDate.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
+                    .font(.system(size: 18, weight: .semibold))
+                Spacer()
+                if !dayBlocks.isEmpty {
+                    Text("\(dayBlocks.count) blocks")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Spacer()
-                Button("Today") { selectedDate = Date() }
-                    .buttonStyle(.bordered)
-                Button {
-                    appState.navigate(to: .calendar)
-                } label: {
-                    Image(systemName: "calendar")
-                }
-                .buttonStyle(.bordered)
             }
 
-            WeekStrip(selectedDate: $selectedDate)
+            weekStrip
+
+            VStack(spacing: 0) {
+                ZStack(alignment: .topLeading) {
+                    hourGrid
+                    scheduleBlocksLayer
+                }
+                .frame(height: rowHeight * 13)
+            }
+            .background(HubPalette.grouped)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(HubPalette.separator, lineWidth: 0.5)
+            )
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 20)
-        .padding(.bottom, 16)
+    }
+
+    private var weekStrip: some View {
+        HStack(spacing: 4) {
+            ForEach(weekDays, id: \.self) { day in
+                let isSelected = Calendar.current.isDate(day, inSameDayAs: selectedDate)
+                let isToday = Calendar.current.isDate(day, inSameDayAs: today)
+                Button {
+                    selectedDate = day
+                } label: {
+                    VStack(spacing: 3) {
+                        Text(day.formatted(.dateTime.weekday(.abbreviated)).uppercased())
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.5)
+                        Text("\(Calendar.current.component(.day, from: day))")
+                            .font(.system(size: 16, weight: isSelected || isToday ? .bold : .semibold))
+                    }
+                    .foregroundStyle(isSelected ? .white : HubPalette.primaryText)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(isSelected ? HubPalette.hubAccent : (isToday ? HubPalette.hubAccent.opacity(0.12) : Color.clear))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private var hourGrid: some View {
@@ -67,137 +430,143 @@ struct DayTimelineView: View {
             ForEach(8..<21, id: \.self) { hour in
                 HStack(spacing: 12) {
                     Text(formatHour(hour))
-                        .font(.caption.monospacedDigit())
+                        .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .frame(width: 52, alignment: .trailing)
-
+                        .frame(width: 50, alignment: .trailing)
                     Rectangle()
-                        .fill(Color.hubSeparator.opacity(0.60))
+                        .fill(HubPalette.separator.opacity(0.6))
                         .frame(height: 1)
                 }
                 .frame(height: rowHeight, alignment: .top)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
     }
 
-    private var scheduleBlocks: some View {
+    private var scheduleBlocksLayer: some View {
         GeometryReader { geometry in
-            let leftInset: CGFloat = 82
-            let rightInset: CGFloat = 18
+            let leftInset: CGFloat = 78
+            let rightInset: CGFloat = 14
             let columnGap: CGFloat = 6
-
             ForEach(positionedBlocks) { positioned in
                 let availableWidth = max(1, geometry.size.width - leftInset - rightInset)
                 let totalGaps = columnGap * CGFloat(max(0, positioned.columnCount - 1))
                 let blockWidth = (availableWidth - totalGaps) / CGFloat(positioned.columnCount)
-
                 ScheduleBlockView(block: positioned.block)
                     .frame(width: blockWidth)
-                    .frame(height: max(54, positioned.block.duration * rowHeight - 8))
+                    .frame(height: max(48, positioned.block.duration * rowHeight - 8))
                     .offset(
                         x: leftInset + CGFloat(positioned.column) * (blockWidth + columnGap),
                         y: (positioned.block.startHour - 8) * rowHeight + 7
                     )
-                    .contextMenu {
-                        if let taskID = positioned.block.linkedTaskID {
-                            Button("Open linked task") {
-                                appState.selectedTaskID = taskID
-                                appState.navigate(to: .tasks)
-                            }
-                        }
-                        Button("Delete", role: .destructive) { appState.deleteScheduleBlock(positioned.block.id) }
+            }
+        }
+    }
+
+    // MARK: - Right rail
+
+    private var rightRail: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if !overdueTasks.isEmpty {
+                railCard(title: "Overdue", count: overdueTasks.count) {
+                    ForEach(overdueTasks) { task in
+                        railTaskRow(task)
+                        if task.id != overdueTasks.last?.id { Divider() }
                     }
-            }
-        }
-    }
-
-    private var positionedBlocks: [PositionedBlock] {
-        let blocks = appState.scheduleBlocks
-            .filter { Calendar.current.isDate($0.date, inSameDayAs: selectedDate) }
-            .sorted { lhs, rhs in
-                lhs.startHour == rhs.startHour ? lhs.duration > rhs.duration : lhs.startHour < rhs.startHour
-            }
-
-        var result: [PositionedBlock] = []
-        var group: [ScheduleBlock] = []
-        var groupEnd = -Double.infinity
-
-        func appendGroup(_ group: [ScheduleBlock], to result: inout [PositionedBlock]) {
-            guard !group.isEmpty else { return }
-            var columnEndHours: [Double] = []
-            var assignments: [(ScheduleBlock, Int)] = []
-
-            for block in group {
-                let reusableColumn = columnEndHours.firstIndex(where: { $0 <= block.startHour })
-                let column = reusableColumn ?? columnEndHours.count
-                if let reusableColumn {
-                    columnEndHours[reusableColumn] = block.startHour + block.duration
-                } else {
-                    columnEndHours.append(block.startHour + block.duration)
                 }
-                assignments.append((block, column))
             }
 
-            let columnCount = max(1, columnEndHours.count)
-            result.append(contentsOf: assignments.map {
-                PositionedBlock(block: $0.0, column: $0.1, columnCount: columnCount)
-            })
-        }
-
-        for block in blocks {
-            if !group.isEmpty, block.startHour >= groupEnd {
-                appendGroup(group, to: &result)
-                group.removeAll(keepingCapacity: true)
-                groupEnd = -Double.infinity
+            railCard(title: "Today", count: tasksDueToday.count) {
+                if tasksDueToday.isEmpty {
+                    Text("All clear for today.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 6)
+                } else {
+                    ForEach(tasksDueToday.prefix(6)) { task in
+                        railTaskRow(task)
+                        if task.id != tasksDueToday.prefix(6).last?.id { Divider() }
+                    }
+                }
             }
-            group.append(block)
-            groupEnd = max(groupEnd, block.startHour + block.duration)
+
+            if !upcomingTasks.isEmpty {
+                railCard(title: "Coming up", count: upcomingTasks.count) {
+                    ForEach(upcomingTasks) { task in
+                        railTaskRow(task)
+                        if task.id != upcomingTasks.last?.id { Divider() }
+                    }
+                }
+            }
+
+            if !appState.captures.isEmpty {
+                railCard(title: "Scratchpad", count: appState.captures.count) {
+                    ForEach(appState.captures.prefix(3)) { capture in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(capture.text)
+                                .font(.system(size: 12, weight: .medium))
+                                .lineLimit(2)
+                                .foregroundStyle(HubPalette.primaryText)
+                            Text(capture.createdAt.formatted(.relative(presentation: .named)))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
         }
-        appendGroup(group, to: &result)
-        return result
     }
 
-    @ViewBuilder
-    private var currentTimeLine: some View {
-        let components = Calendar.current.dateComponents([.hour, .minute], from: Date())
-        let hour = Double(components.hour ?? 0) + Double(components.minute ?? 0) / 60
-        if Calendar.current.isDateInToday(selectedDate), hour >= 8 && hour <= 20 {
-            HStack(spacing: 6) {
-                Text(Date.now.formatted(date: .omitted, time: .shortened))
-                    .font(.caption.bold().monospacedDigit())
-                    .foregroundStyle(.red)
-                    .frame(width: 58, alignment: .trailing)
-                Circle()
-                    .fill(.red)
-                    .frame(width: 7, height: 7)
-                Rectangle()
-                    .fill(.red)
-                    .frame(height: 1)
+    private func railCard<Content: View>(title: String, count: Int, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("\(count)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 16)
-            .offset(y: (hour - 8) * rowHeight)
+            VStack(spacing: 0) {
+                content()
+            }
+            .padding(10)
+            .background(HubPalette.grouped)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(HubPalette.separator, lineWidth: 0.5)
+            )
         }
     }
 
-    private var dropTarget: some View {
-        Label("Drag a task here to schedule", systemImage: "calendar.badge.plus")
-            .font(.headline)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, minHeight: 74)
-            .background(Color.hubGroupedSecondary.opacity(0.34))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.secondary.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [5]))
+    private func railTaskRow(_ task: HubTask) -> some View {
+        HStack(spacing: 8) {
+            Button { appState.toggleComplete(task.id) } label: {
+                Image(systemName: task.isCompleted ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(task.course.accent)
             }
-            .padding(.horizontal, 16)
-            .dropDestination(for: String.self) { values, _ in
-                guard let value = values.first, let id = UUID(uuidString: value) else { return false }
-                appState.schedule(id, at: 16, on: selectedDate)
-                return true
+            .buttonStyle(.plain)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(task.title)
+                    .font(.system(size: 13, weight: .medium))
+                    .strikethrough(task.isCompleted)
+                    .lineLimit(1)
+                Text("\(task.course.title) · \(task.dueDate.formatted(.relative(presentation: .named)))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
+            Spacer()
+        }
+        .padding(.vertical, 5)
     }
+
+    // MARK: - Helpers
 
     private func formatHour(_ hour: Int) -> String {
         let suffix = hour < 12 ? "AM" : "PM"
@@ -206,89 +575,35 @@ struct DayTimelineView: View {
     }
 }
 
-private struct WeekStrip: View {
-    @Binding var selectedDate: Date
-
-    private var week: [Date] {
-        let calendar = Calendar.current
-        let chosenDay = calendar.startOfDay(for: selectedDate)
-        let weekday = calendar.component(.weekday, from: chosenDay)
-        let daysFromMonday = (weekday + 5) % 7
-        let monday = calendar.date(byAdding: .day, value: -daysFromMonday, to: chosenDay) ?? chosenDay
-        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: monday) }
-    }
-
-    var body: some View {
-        HStack(spacing: 8) {
-            ForEach(week, id: \.self) { date in
-                let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
-                Button {
-                    selectedDate = date
-                } label: {
-                    VStack(spacing: 6) {
-                        Text(date.formatted(.dateTime.weekday(.abbreviated)))
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(isSelected ? HubPalette.hubAccent : .secondary)
-                        Text(date.formatted(.dateTime.day()))
-                            .font(.title3.monospacedDigit().weight(isSelected ? .semibold : .regular))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(isSelected ? HubPalette.hubAccent.opacity(0.16) : .clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-}
-
 private struct ScheduleBlockView: View {
     let block: ScheduleBlock
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "circle.grid.2x2")
-                .font(.caption)
-                .foregroundStyle(block.course.accent)
-
-            VStack(alignment: .leading, spacing: 3) {
+        HStack(spacing: 9) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(block.course.accent)
+                .frame(width: 4)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(block.title)
-                    .font(.headline)
-                Text(timeRange)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11, weight: .bold))
+                    .lineLimit(1)
                 Text(block.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 9))
+                    .lineLimit(1)
             }
             Spacer()
-            Image(systemName: block.course == .chemistry ? "flask" : "ellipsis")
-                .foregroundStyle(block.course.accent)
+            if block.linkedTaskID != nil {
+                Image(systemName: "link")
+                    .font(.system(size: 9))
+            }
         }
-        .padding(12)
-        .background(block.course.accent.opacity(0.16))
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(block.course.accent.opacity(0.18))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(alignment: .leading) {
-            Rectangle()
-                .fill(block.course.accent)
-                .frame(width: 2)
-        }
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(block.course.accent.opacity(0.80), lineWidth: 1)
+                .stroke(block.course.accent.opacity(0.65), lineWidth: 1)
         }
-    }
-
-    private var timeRange: String {
-        "\(format(block.startHour)) – \(format(block.startHour + block.duration))"
-    }
-
-    private func format(_ hour: Double) -> String {
-        let whole = Int(hour)
-        let minute = Int((hour - Double(whole)) * 60)
-        let suffix = whole < 12 ? "AM" : "PM"
-        let display = whole == 12 ? 12 : whole % 12
-        return String(format: "%d:%02d %@", display, minute, suffix)
     }
 }

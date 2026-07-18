@@ -1,9 +1,25 @@
 import Foundation
 
 enum WorkspaceStorage {
+    private static var storageName: String {
+        #if DEBUG
+        "StudentHub-Debug"
+        #else
+        "StudentHub"
+        #endif
+    }
+
+    private static var libraryName: String {
+        #if DEBUG
+        "Student Hub Debug Library"
+        #else
+        "Student Hub Library"
+        #endif
+    }
+
     static var applicationSupportURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return base.appendingPathComponent("StudentHub", isDirectory: true)
+        return base.appendingPathComponent(storageName, isDirectory: true)
     }
 
     static var databaseURL: URL {
@@ -12,7 +28,7 @@ enum WorkspaceStorage {
 
     static var libraryURL: URL {
         let base = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return base.appendingPathComponent("Student Hub Library", isDirectory: true)
+        return base.appendingPathComponent(libraryName, isDirectory: true)
     }
 
     static var notesURL: URL { libraryURL.appendingPathComponent("Notes", isDirectory: true) }

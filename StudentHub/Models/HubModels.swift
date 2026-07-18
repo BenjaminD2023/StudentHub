@@ -178,8 +178,17 @@ struct CommandToken: Equatable, Identifiable {
 
 enum CommandIntent: Equatable {
     case createTask
+    case capture(text: String)
+    case createProject
+    case createNote
     case rescheduleTask(query: String)
     case search(query: String)
+    case startTimer(FocusTimerCommand)
+}
+
+enum FocusTimerCommand: Equatable {
+    case countdown(seconds: Int)
+    case stopwatch
 }
 
 struct CommandInterpretation: Equatable {
@@ -189,9 +198,20 @@ struct CommandInterpretation: Equatable {
     var summary: String {
         switch intent {
         case .createTask: "Create a new task"
+        case .capture: "Save to the scratchpad"
+        case .createProject: "Create a new project"
+        case .createNote: "Create a new note"
         case .rescheduleTask(let query): "Reschedule “\(query)”"
         case .search(let query): "Search tasks for “\(query)”"
+        case .startTimer(.countdown(let seconds)): "Start a \(Self.durationLabel(seconds)) countdown"
+        case .startTimer(.stopwatch): "Start a stopwatch"
         }
+    }
+
+    private static func durationLabel(_ seconds: Int) -> String {
+        if seconds.isMultiple(of: 3600) { return "\(seconds / 3600) hour" + (seconds == 3600 ? "" : "s") }
+        if seconds.isMultiple(of: 60) { return "\(seconds / 60) minute" + (seconds == 60 ? "" : "s") }
+        return "\(seconds) second" + (seconds == 1 ? "" : "s")
     }
 }
 
@@ -201,6 +221,18 @@ enum CommandInterpreter {
         let lowered = trimmed.lowercased()
         let draft = CommandParser.parse(trimmed, now: now, calendar: calendar, spaces: spaces)
 
+        if let timerCommand = timerCommand(in: lowered) {
+            return CommandInterpretation(intent: .startTimer(timerCommand), draft: draft)
+        }
+        if let capture = payload(in: trimmed, prefixes: ["/capture", "capture:", "save to scratchpad"]) {
+            return CommandInterpretation(intent: .capture(text: capture), draft: draft)
+        }
+        if payload(in: trimmed, prefixes: ["/project", "create project", "new project"]) != nil {
+            return CommandInterpretation(intent: .createProject, draft: draft)
+        }
+        if payload(in: trimmed, prefixes: ["/note", "create note", "new note"]) != nil {
+            return CommandInterpretation(intent: .createNote, draft: draft)
+        }
         if let target = rescheduleTarget(in: trimmed) {
             return CommandInterpretation(intent: .rescheduleTask(query: target), draft: draft)
         }
@@ -210,6 +242,38 @@ enum CommandInterpreter {
             return CommandInterpretation(intent: .search(query: query), draft: draft)
         }
         return CommandInterpretation(intent: .createTask, draft: draft)
+    }
+
+    private static func timerCommand(in input: String) -> FocusTimerCommand? {
+        let normalized = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if ["start pomo", "start pomodoro", "/pomo", "/pomodoro"].contains(normalized) {
+            return .countdown(seconds: 25 * 60)
+        }
+        if ["start timer", "start stopwatch", "/timer", "/stopwatch"].contains(normalized) {
+            return .stopwatch
+        }
+
+        let patterns = [
+            #"^start\s+(\d+)\s*(second|seconds|minute|minutes|hour|hours)\s+(?:countdown|timer)$"#,
+            #"^start\s+(?:a\s+)?(?:countdown|timer)\s+(?:for\s+)?(\d+)\s*(second|seconds|minute|minutes|hour|hours)$"#
+        ]
+        for pattern in patterns {
+            guard let expression = try? NSRegularExpression(pattern: pattern),
+                  let match = expression.firstMatch(in: normalized, range: NSRange(normalized.startIndex..., in: normalized)),
+                  let valueRange = Range(match.range(at: 1), in: normalized),
+                  let unitRange = Range(match.range(at: 2), in: normalized),
+                  let value = Int(normalized[valueRange]), value > 0 else { continue }
+            let unit = normalized[unitRange]
+            let multiplier = unit.hasPrefix("hour") ? 3600 : (unit.hasPrefix("minute") ? 60 : 1)
+            return .countdown(seconds: min(value * multiplier, 24 * 60 * 60))
+        }
+        return nil
+    }
+
+    private static func payload(in input: String, prefixes: [String]) -> String? {
+        let lowered = input.lowercased()
+        guard let prefix = prefixes.first(where: { lowered == $0 || lowered.hasPrefix($0 + " ") }) else { return nil }
+        return String(input.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func rescheduleTarget(in input: String) -> String? {
@@ -302,6 +366,11 @@ enum CommandParser {
         for token in recognizedTokens where token.kind != .course {
             title = title.replacingOccurrences(of: token.text, with: "", options: [.caseInsensitive])
         }
+        title = title.replacingOccurrences(
+            of: #"(?i)^\s*(?:/(?:capture|project|note)|create\s+(?:project|note)|new\s+(?:project|note)|save\s+to\s+scratchpad|capture:)\s*"#,
+            with: "",
+            options: .regularExpression
+        )
         title = title.replacingOccurrences(of: #"(?i)^\s*(?:add|create|task|move|reschedule)\s+"#, with: "", options: .regularExpression)
         title = title.replacingOccurrences(of: #"\s+#\w+"#, with: "", options: .regularExpression)
         title = title.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)

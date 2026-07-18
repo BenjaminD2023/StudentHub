@@ -294,7 +294,7 @@ struct PomodoroWorkspaceView: View {
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
-            Text("FOCUS SESSION")
+            Text(appState.focusTimerMode == .countdown ? "FOCUS COUNTDOWN" : "STOPWATCH")
                 .font(.system(size: 11, weight: .bold))
                 .tracking(1.8)
                 .foregroundStyle(HubPalette.secondaryText)
@@ -313,12 +313,22 @@ struct PomodoroWorkspaceView: View {
                 Button(appState.pomodoroRunning ? "Pause" : "Start") { appState.togglePomodoro() }
                     .buttonStyle(HubProminentButtonStyle())
                     .controlSize(.large)
+                Button("Reset") {
+                    if appState.focusTimerMode == .countdown { appState.resetPomodoro() }
+                    else { appState.resetStopwatch() }
+                }
+                .buttonStyle(.bordered)
+            }
+            HStack(spacing: 10) {
                 Button("25 min") { appState.resetPomodoro(minutes: 25) }.buttonStyle(.bordered)
                 Button("5 min break") { appState.resetPomodoro(minutes: 5) }.buttonStyle(.bordered)
+                Button("Count up") { appState.resetStopwatch() }.buttonStyle(.bordered)
             }
-            Text("The timer keeps running while you use other Student Hub pages.")
+            Text("Try “start pomo”, “start 25 minute countdown”, or “start timer” in Command Hub.")
                 .font(.system(size: 11))
                 .foregroundStyle(HubPalette.secondaryText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

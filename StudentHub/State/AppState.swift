@@ -24,6 +24,7 @@ final class AppState: ObservableObject {
     @Published var selectedJournalID: UUID?
     @Published var selectedMeetingID: UUID?
     @Published var selectedFileID: UUID?
+    @Published var selectedSpaceID: String?
     @Published var openNoteIDs: [UUID] = []
     @Published var taskCourseFilter: Course? = nil
 
@@ -31,6 +32,8 @@ final class AppState: ObservableObject {
     @Published var isQuickCommandPresented = false
     @Published var pomodoroRemaining = 25 * 60
     @Published var pomodoroRunning = false
+    @Published var focusTimerMode: FocusTimerMode = .countdown
+    @Published var focusTimerElapsed = 0
     @Published var pomodoroLinkedTaskID: UUID?
     @Published var lastExportURLs: [URL] = []
     @Published var statusMessage: String?
@@ -51,6 +54,9 @@ final class AppState: ObservableObject {
     }
 
     private var pomodoroTimer: Timer?
+    private var countdownEndDate: Date?
+    private var stopwatchStartedAt: Date?
+    private var stopwatchBaseElapsed = 0
     private var cloudPushTask: Task<Void, Never>?
     private var workspaceModifiedAt = Date.distantPast
     private var isApplyingRemoteSnapshot = false
@@ -109,6 +115,7 @@ final class AppState: ObservableObject {
         selectedMeetingID = meetings.first?.id
         selectedFileID = files.first?.id
         if let selectedNoteID { openNoteIDs = [selectedNoteID] }
+        if let timer = storedSnapshot?.focusTimer { restoreFocusTimer(from: timer) }
         try? WorkspaceStorage.prepareDirectories()
         if seedData, storedSnapshot == nil { persist() }
         if isCloudSyncEnabled {
@@ -137,8 +144,14 @@ final class AppState: ObservableObject {
     }
 
     var pomodoroLabel: String {
-        String(format: "%02d:%02d", pomodoroRemaining / 60, pomodoroRemaining % 60)
+        let seconds = focusTimerMode == .countdown ? pomodoroRemaining : focusTimerElapsed
+        if seconds >= 3600 {
+            return String(format: "%02d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60)
+        }
+        return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
+
+    var focusTimerTitle: String { focusTimerMode == .countdown ? "Countdown" : "Stopwatch" }
 
     var cloudSyncDetail: String? {
         switch cloudSyncStatus {
@@ -439,7 +452,13 @@ final class AppState: ObservableObject {
 
     @discardableResult
     func addProject(title: String, course: Course, deadline: Date, details: String = "") -> HubProject {
-        let project = HubProject(title: title.isEmpty ? "Untitled project" : title, course: canonicalSpace(course), deadline: deadline, details: details)
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let project = HubProject(
+            title: trimmedTitle.isEmpty ? "Untitled project" : trimmedTitle,
+            course: canonicalSpace(course),
+            deadline: deadline,
+            details: details.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
         projects.insert(project, at: 0)
         selectedProjectID = project.id
         persist()
@@ -449,6 +468,8 @@ final class AppState: ObservableObject {
     func updateProject(_ project: HubProject) {
         guard let index = projects.firstIndex(where: { $0.id == project.id }) else { return }
         var updated = project
+        let trimmedTitle = project.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.title = trimmedTitle.isEmpty ? "Untitled project" : trimmedTitle
         updated.course = canonicalSpace(project.course)
         projects[index] = updated
         persist()
@@ -482,15 +503,30 @@ final class AppState: ObservableObject {
 
     func updateNote(_ note: HubNote) {
         guard let index = notes.firstIndex(where: { $0.id == note.id }) else { return }
+        let previous = notes[index]
         var updated = note
         updated.course = canonicalSpace(note.course)
         updated.modifiedAt = Date()
         notes[index] = updated
-        saveNoteFile(updated)
+        if persistenceEnabled {
+            do {
+                _ = try WorkspaceStorage.writeMarkdown(updated)
+                let previousURL = WorkspaceStorage.markdownURL(for: previous)
+                let updatedURL = WorkspaceStorage.markdownURL(for: updated)
+                if previousURL != updatedURL, FileManager.default.fileExists(atPath: previousURL.path) {
+                    try FileManager.default.removeItem(at: previousURL)
+                }
+            } catch {
+                statusMessage = "Could not write Markdown: \(error.localizedDescription)"
+            }
+        }
         persist()
     }
 
     func deleteNote(_ id: UUID) {
+        if persistenceEnabled, let note = notes.first(where: { $0.id == id }) {
+            try? FileManager.default.removeItem(at: WorkspaceStorage.markdownURL(for: note))
+        }
         notes.removeAll(where: { $0.id == id })
         openNoteIDs.removeAll(where: { $0 == id })
         if selectedNoteID == id { selectedNoteID = openNoteIDs.last ?? notes.first?.id }
@@ -532,7 +568,20 @@ final class AppState: ObservableObject {
 
     @discardableResult
     func addJournalEntry(date: Date = Date()) -> JournalEntry {
-        let entry = JournalEntry(date: date, title: date.formatted(date: .long, time: .omitted))
+        let entry = JournalEntry(
+            date: date,
+            title: date.formatted(date: .long, time: .omitted),
+            isDateLinked: true
+        )
+        journalEntries.insert(entry, at: 0)
+        selectedJournalID = entry.id
+        persist()
+        return entry
+    }
+
+    @discardableResult
+    func addJournalMemo() -> JournalEntry {
+        let entry = JournalEntry(title: "Untitled memo", isDateLinked: false)
         journalEntries.insert(entry, at: 0)
         selectedJournalID = entry.id
         persist()
@@ -670,36 +719,144 @@ final class AppState: ObservableObject {
     // MARK: - Pomodoro
 
     func togglePomodoro() {
-        pomodoroRunning.toggle()
         if pomodoroRunning {
-            pomodoroTimer?.invalidate()
-            pomodoroTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-                Task { @MainActor in self?.pomodoroTick() }
+            updateFocusTimerDisplay()
+            pomodoroRunning = false
+            if focusTimerMode == .countdown {
+                countdownEndDate = nil
+            } else {
+                stopwatchBaseElapsed = focusTimerElapsed
+                stopwatchStartedAt = nil
             }
-        } else {
             pomodoroTimer?.invalidate()
             pomodoroTimer = nil
+        } else {
+            pomodoroRunning = true
+            if focusTimerMode == .countdown {
+                if pomodoroRemaining <= 0 { pomodoroRemaining = 25 * 60 }
+                countdownEndDate = Date().addingTimeInterval(TimeInterval(pomodoroRemaining))
+            } else {
+                stopwatchStartedAt = Date()
+            }
+            startFocusTimerTicks()
         }
+        persist()
     }
 
     func resetPomodoro(minutes: Int = 25) {
         pomodoroTimer?.invalidate()
         pomodoroTimer = nil
         pomodoroRunning = false
+        focusTimerMode = .countdown
         pomodoroRemaining = minutes * 60
+        countdownEndDate = nil
+        persist()
+    }
+
+    func resetStopwatch() {
+        pomodoroTimer?.invalidate()
+        pomodoroTimer = nil
+        pomodoroRunning = false
+        focusTimerMode = .stopwatch
+        focusTimerElapsed = 0
+        stopwatchBaseElapsed = 0
+        stopwatchStartedAt = nil
+        persist()
+    }
+
+    func startFocusTimer(_ command: FocusTimerCommand) {
+        switch command {
+        case .countdown(let seconds):
+            pomodoroTimer?.invalidate()
+            focusTimerMode = .countdown
+            pomodoroRemaining = seconds
+            countdownEndDate = Date().addingTimeInterval(TimeInterval(seconds))
+            stopwatchStartedAt = nil
+            pomodoroRunning = true
+            statusMessage = "Started \(durationLabel(seconds)) countdown"
+        case .stopwatch:
+            pomodoroTimer?.invalidate()
+            focusTimerMode = .stopwatch
+            focusTimerElapsed = 0
+            stopwatchBaseElapsed = 0
+            stopwatchStartedAt = Date()
+            countdownEndDate = nil
+            pomodoroRunning = true
+            statusMessage = "Started stopwatch"
+        }
+        startFocusTimerTicks()
+        persist()
+    }
+
+    private func startFocusTimerTicks() {
+        pomodoroTimer?.invalidate()
+        pomodoroTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.pomodoroTick() }
+        }
     }
 
     private func pomodoroTick() {
         guard pomodoroRunning else { return }
-        if pomodoroRemaining > 0 {
-            pomodoroRemaining -= 1
-        } else {
+        updateFocusTimerDisplay()
+        if focusTimerMode == .countdown, pomodoroRemaining <= 0 {
             pomodoroRunning = false
             pomodoroTimer?.invalidate()
             pomodoroTimer = nil
-            let notification = HubReminder(title: "Pomodoro complete", dueDate: Date())
+            countdownEndDate = nil
+            statusMessage = "Countdown complete"
+            let notification = HubReminder(title: "Focus timer complete", dueDate: Date().addingTimeInterval(1))
             scheduleNotification(for: notification)
+            persist()
         }
+    }
+
+    private func updateFocusTimerDisplay(now: Date = Date()) {
+        if focusTimerMode == .countdown, let countdownEndDate {
+            pomodoroRemaining = max(0, Int(ceil(countdownEndDate.timeIntervalSince(now))))
+        } else if focusTimerMode == .stopwatch, let stopwatchStartedAt {
+            focusTimerElapsed = stopwatchBaseElapsed + max(0, Int(now.timeIntervalSince(stopwatchStartedAt)))
+        }
+    }
+
+    private func durationLabel(_ seconds: Int) -> String {
+        if seconds.isMultiple(of: 3600) { return "\(seconds / 3600)-hour" }
+        if seconds.isMultiple(of: 60) { return "\(seconds / 60)-minute" }
+        return "\(seconds)-second"
+    }
+
+    private var focusTimerSnapshot: FocusTimerSnapshot {
+        FocusTimerSnapshot(
+            mode: focusTimerMode,
+            isRunning: pomodoroRunning,
+            countdownRemaining: pomodoroRemaining,
+            countdownEndDate: countdownEndDate,
+            stopwatchElapsed: stopwatchBaseElapsed,
+            stopwatchStartedAt: stopwatchStartedAt
+        )
+    }
+
+    private func restoreFocusTimer(from snapshot: FocusTimerSnapshot) {
+        pomodoroTimer?.invalidate()
+        focusTimerMode = snapshot.mode
+        pomodoroRunning = snapshot.isRunning
+        pomodoroRemaining = snapshot.countdownRemaining
+        countdownEndDate = snapshot.countdownEndDate
+        stopwatchBaseElapsed = snapshot.stopwatchElapsed
+        focusTimerElapsed = snapshot.stopwatchElapsed
+        stopwatchStartedAt = snapshot.stopwatchStartedAt
+
+        if focusTimerMode == .countdown, pomodoroRunning {
+            let end = countdownEndDate ?? Date().addingTimeInterval(TimeInterval(pomodoroRemaining))
+            countdownEndDate = end
+            pomodoroRemaining = max(0, Int(ceil(end.timeIntervalSinceNow)))
+            if pomodoroRemaining == 0 { pomodoroRunning = false; countdownEndDate = nil }
+        } else if focusTimerMode == .stopwatch, pomodoroRunning {
+            let start = stopwatchStartedAt ?? Date()
+            stopwatchStartedAt = start
+            focusTimerElapsed = stopwatchBaseElapsed + max(0, Int(Date().timeIntervalSince(start)))
+        }
+
+        if pomodoroRunning { startFocusTimerTicks() }
     }
 
     // MARK: - Persistence
@@ -756,7 +913,8 @@ final class AppState: ObservableObject {
             meetings: meetings,
             reminders: reminders,
             files: files,
-            captures: captures
+            captures: captures,
+            focusTimer: focusTimerSnapshot
         )
     }
 
@@ -794,6 +952,7 @@ final class AppState: ObservableObject {
         reminders = snapshot.reminders
         files = snapshot.files
         captures = snapshot.captures
+        restoreFocusTimer(from: snapshot.focusTimer ?? .idlePomodoro)
 
         if !tasks.contains(where: { $0.id == selectedTaskID }) { selectedTaskID = tasks.first?.id }
         if !projects.contains(where: { $0.id == selectedProjectID }) { selectedProjectID = projects.first?.id }
@@ -801,6 +960,9 @@ final class AppState: ObservableObject {
         if !journalEntries.contains(where: { $0.id == selectedJournalID }) { selectedJournalID = journalEntries.first?.id }
         if !meetings.contains(where: { $0.id == selectedMeetingID }) { selectedMeetingID = meetings.first?.id }
         if !files.contains(where: { $0.id == selectedFileID }) { selectedFileID = files.first?.id }
+        if let spaceID = selectedSpaceID, !spaces.contains(where: { $0.id == spaceID }) {
+            selectedSpaceID = spaces.first?.id
+        }
         openNoteIDs.removeAll { id in !notes.contains(where: { $0.id == id }) }
 
         do {
@@ -814,6 +976,7 @@ final class AppState: ObservableObject {
     }
 
     private func saveNoteFile(_ note: HubNote) {
+        guard persistenceEnabled else { return }
         do { _ = try WorkspaceStorage.writeMarkdown(note) }
         catch { statusMessage = "Could not write Markdown: \(error.localizedDescription)" }
     }

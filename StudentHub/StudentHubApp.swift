@@ -33,14 +33,16 @@ struct StudentHubApp: App {
                 }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
 
-                Button("Toggle Quick Command") {
-                    #if os(macOS)
+                #if os(macOS)
+                Button("Toggle Quick Command (⌥ Space)") {
                     NotificationCenter.default.post(name: .toggleQuickPanel, object: nil)
-                    #else
+                }
+                #else
+                Button("Toggle Quick Command") {
                     appState.isQuickCommandPresented.toggle()
-                    #endif
                 }
                 .keyboardShortcut(.space, modifiers: [.option])
+                #endif
 
                 Divider()
 
@@ -51,5 +53,16 @@ struct StudentHubApp: App {
                 .keyboardShortcut("s", modifiers: [.command, .option])
             }
         }
+
+        #if os(macOS)
+        WindowGroup("Note", for: UUID.self) { $noteID in
+            if let noteID {
+                NoteWindowView(noteID: noteID)
+                    .environmentObject(appState)
+                    .preferredColorScheme(appState.appearance.colorScheme)
+            }
+        }
+        .defaultSize(width: 940, height: 700)
+        #endif
     }
 }

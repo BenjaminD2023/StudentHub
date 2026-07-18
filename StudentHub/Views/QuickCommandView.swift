@@ -1,13 +1,18 @@
 import SwiftUI
 
+/// Quick Command (Spotlight) — polished command palette triggered
+/// by ⌥-Space. Lets the user run natural-language commands like
+/// "chem lab report tomorrow 7:30 pm" to create tasks, capture
+/// thoughts, search, and more.
 struct QuickCommandView: View {
     enum Action: String, CaseIterable {
         case createTask = "Create task"
         case capture = "Save to scratchpad"
         case reschedule = "Reschedule task"
-        case schedule = "Schedule"
+        case schedule = "Schedule on calendar"
         case addProject = "Add project"
         case createNote = "Create note"
+        case startTimer = "Start timer"
         case searchNotes = "Search notes"
         case searchFiles = "Search files"
 
@@ -19,13 +24,24 @@ struct QuickCommandView: View {
             case .schedule: "calendar"
             case .addProject: "folder"
             case .createNote: "doc.text"
+            case .startTimer: "timer"
             case .searchNotes, .searchFiles: "magnifyingglass"
+            }
+        }
+
+        var tint: Color {
+            switch self {
+            case .createTask, .schedule, .reschedule: return HubPalette.hubAccent
+            case .capture, .createNote: return HubPalette.success
+            case .addProject: return HubPalette.yellow
+            case .startTimer: return Color(red: 0.35, green: 0.48, blue: 0.95)
+            case .searchNotes, .searchFiles: return Color(red: 0.55, green: 0.4, blue: 0.85)
             }
         }
     }
 
     @EnvironmentObject private var appState: AppState
-    @State private var input = "chem lab report tomorrow 7:30 pm"
+    @State private var input = ""
     @State private var selectedAction: Action = .createTask
     @FocusState private var inputFocused: Bool
     let onDismiss: () -> Void
@@ -40,197 +56,454 @@ struct QuickCommandView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            inputRow
+            inputBar
             Divider()
 
             GeometryReader { proxy in
-                if proxy.size.width >= 620 {
-                    HStack(spacing: 0) {
-                        actions
-                            .frame(width: proxy.size.width * 0.48)
-                        Divider()
-                        preview
-                    }
-                } else {
+                let compact = proxy.size.width < 620
+                if compact {
                     ScrollView {
                         VStack(spacing: 0) {
-                            actions
+                            actionsList
                             Divider()
                             preview
                         }
+                    }
+                } else {
+                    HStack(spacing: 0) {
+                        actionsList
+                            .frame(width: max(300, proxy.size.width * 0.46))
+                        Divider()
+                        preview
                     }
                 }
             }
 
             footer
         }
-        .frame(minWidth: 360, idealWidth: 780, minHeight: 390, idealHeight: 390)
+        .frame(minWidth: 360, idealWidth: 820, minHeight: 460, idealHeight: 500)
         .background(Color.hubGrouped)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.hubSeparator, lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.24), radius: 24, y: 10)
+        .shadow(color: .black.opacity(0.22), radius: 30, y: 12)
         .preferredColorScheme(appState.appearance.colorScheme)
         .onAppear {
             DispatchQueue.main.async { inputFocused = true }
         }
         .onChange(of: input) { _, _ in
-            if case .rescheduleTask = interpretation.intent {
-                selectedAction = .reschedule
-            } else if selectedAction == .reschedule {
-                selectedAction = .createTask
-            }
+            updateSuggestedAction()
         }
         #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: .quickPanelWillOpen)) { _ in reset() }
         .onExitCommand(perform: onDismiss)
+        .onMoveCommand { direction in
+            switch direction {
+            case .up: moveSelection(by: -1)
+            case .down: moveSelection(by: 1)
+            default: break
+            }
+        }
         #endif
     }
 
-    private var inputRow: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "command")
-                .foregroundStyle(.secondary)
+    // MARK: - Input bar
 
+    private var inputBar: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        colors: [HubPalette.hubAccent, HubPalette.hubAccent.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 30, height: 30)
+                Image(systemName: "command")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+            }
             TextField("Capture, search, or run a command", text: $input)
-                .font(.title3)
+                .font(.system(size: 17, weight: .medium))
                 .textFieldStyle(.plain)
                 .focused($inputFocused)
                 .onSubmit(executeAction)
-
+            if !input.isEmpty {
+                Button { input = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
             Button(action: executeAction) {
                 Image(systemName: "return")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(HubPalette.hubAccent, in: Circle())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .keyboardShortcut(.return, modifiers: [])
         }
-        .padding(.horizontal, 16)
-        .frame(height: 62)
+        .padding(.horizontal, 18)
+        .frame(height: 64)
     }
 
-    private var actions: some View {
+    // MARK: - Actions list
+
+    private var actionsList: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                actionGroup(title: "Best match", actions: [.createTask, .capture])
+                actionGroup(title: "Actions", actions: [.startTimer, .reschedule, .schedule, .addProject, .createNote])
+                actionGroup(title: "Search", actions: [.searchNotes, .searchFiles])
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func actionGroup(title: String, actions: [Action]) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("BEST MATCH")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-
-            QuickActionRow(title: Action.createTask.rawValue, icon: Action.createTask.icon, isSelected: selectedAction == .createTask) {
-                selectedAction = .createTask
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .tracking(0.8)
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 18)
+                .padding(.top, 10)
+                .padding(.bottom, 4)
+            ForEach(actions, id: \.self) { action in
+                QuickActionRow(
+                    title: action.rawValue,
+                    icon: action.icon,
+                    tint: action.tint,
+                    isSelected: selectedAction == action
+                ) {
+                    selectedAction = action
+                }
             }
-
-            QuickActionRow(title: Action.capture.rawValue, icon: Action.capture.icon, isSelected: selectedAction == .capture) {
-                selectedAction = .capture
-            }
-
-            Text("ACTIONS")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.top, 2)
-
-            QuickActionRow(title: Action.reschedule.rawValue, icon: Action.reschedule.icon, isSelected: selectedAction == .reschedule) { selectedAction = .reschedule }
-            QuickActionRow(title: Action.schedule.rawValue, icon: Action.schedule.icon, isSelected: selectedAction == .schedule) { selectedAction = .schedule }
-            QuickActionRow(title: Action.addProject.rawValue, icon: Action.addProject.icon, isSelected: selectedAction == .addProject) { selectedAction = .addProject }
-            QuickActionRow(title: Action.createNote.rawValue, icon: Action.createNote.icon, isSelected: selectedAction == .createNote) { selectedAction = .createNote }
-
-            Text("SEARCH")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.top, 2)
-
-            QuickActionRow(title: Action.searchNotes.rawValue, icon: Action.searchNotes.icon, isSelected: selectedAction == .searchNotes) { selectedAction = .searchNotes }
-            QuickActionRow(title: Action.searchFiles.rawValue, icon: Action.searchFiles.icon, isSelected: selectedAction == .searchFiles) { selectedAction = .searchFiles }
-            Spacer(minLength: 8)
         }
-        .padding(.vertical, 8)
     }
+
+    // MARK: - Preview
 
     private var preview: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("PREVIEW")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("PREVIEW")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .tracking(0.8)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    if !previewTokens.isEmpty {
+                        Text("\(previewTokens.count) detected")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(HubPalette.hubAccent)
+                    }
+                }
 
-            HStack(spacing: 10) {
-                Image(systemName: selectedAction.icon)
-                    .font(.title3)
-                Text(selectedAction == .reschedule ? interpretation.summary : draft.title)
-                    .font(.headline)
+                previewHeader
+
+                tokenChips
+
+                if previewTokens.isEmpty, selectedActionUsesDate {
+                    HStack(spacing: 8) {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundStyle(HubPalette.yellow)
+                            .font(.callout)
+                        Text("Try “Jul 22”, “in 3 days”, “7月20日”, or “下周三下午4点”.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(HubPalette.yellow.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                } else if selectedAction == .capture {
+                    Label("This stays in Scratchpad until you turn it into a task or note.", systemImage: "tray.full")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+
+                Divider()
+
+                metadataBlock
+
+                Spacer(minLength: 4)
+
+                actionButtons
             }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
 
-            if draft.recognizedTokens.isEmpty {
-                Text("Try “Jul 22”, “in 3 days”, “next Tue”, “7月20日”, or “下周三下午4点”.")
-                    .font(.caption)
+    private var previewHeader: some View {
+        HStack(alignment: .top, spacing: 12) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(selectedAction.tint.opacity(0.16))
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Image(systemName: selectedAction.icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(selectedAction.tint)
+                )
+            VStack(alignment: .leading, spacing: 4) {
+                Text(previewTitle)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(HubPalette.primaryText)
+                    .lineLimit(2)
+                Text(previewSubtitle)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
-            } else {
+            }
+            Spacer()
+        }
+    }
+
+    private var previewTitle: String {
+        if selectedAction == .capture {
+            return captureText.isEmpty ? "Save thought" : captureText
+        }
+        if selectedAction == .reschedule {
+            if case .rescheduleTask(let query) = interpretation.intent {
+                return "Reschedule “\(query)”"
+            }
+            return "Reschedule task"
+        }
+        if selectedAction == .schedule { return draft.title.isEmpty ? "Schedule" : draft.title }
+        if selectedAction == .startTimer {
+            switch selectedTimerCommand {
+            case .countdown(let seconds): return "\(durationLabel(seconds)) countdown"
+            case .stopwatch: return "Stopwatch"
+            }
+        }
+        if selectedAction == .addProject, draft.title == "Untitled task" { return "Untitled project" }
+        if selectedAction == .createNote, draft.title == "Untitled task" { return "Untitled note" }
+        return draft.title
+    }
+
+    private var previewSubtitle: String {
+        switch selectedAction {
+        case .createTask: return "A new task will be created"
+        case .capture: return "Saved to your scratchpad"
+        case .reschedule: return "Find the matching task and move it"
+        case .schedule: return "Adds a colored block to the calendar"
+        case .addProject: return "A new project will be created"
+        case .createNote: return "A new markdown note will open"
+        case .startTimer: return "Runs across every Student Hub workspace"
+        case .searchNotes, .searchFiles: return "Search the workspace"
+        }
+    }
+
+    private var tokenChips: some View {
+        Group {
+            if !previewTokens.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 7) {
-                        ForEach(draft.recognizedTokens) { token in
-                            Label(token.text, systemImage: token.icon)
-                                .font(.caption.weight(.medium))
-                                .padding(.horizontal, 8)
-                                .frame(height: 25)
-                                .background(HubPalette.selected)
-                                .clipShape(Capsule())
+                    HStack(spacing: 6) {
+                        ForEach(previewTokens) { token in
+                            HStack(spacing: 5) {
+                                Image(systemName: token.icon)
+                                    .font(.system(size: 10, weight: .bold))
+                                Text(token.text)
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(tokenColor(token).opacity(0.14))
+                            .foregroundStyle(tokenColor(token))
+                            .clipShape(Capsule())
                         }
                     }
                 }
             }
-
-            LabeledContent("Subject") {
-                Label(draft.course.title, systemImage: "circle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(draft.course.accent)
-            }
-
-            LabeledContent("Due") {
-                Text(draft.dueDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))
-            }
-
-            Divider()
-
-            if let note = draft.linkedNote {
-                Label(note, systemImage: "doc.text")
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            HStack {
-                Button(selectedAction.rawValue, action: executeAction)
-                    .buttonStyle(HubProminentButtonStyle())
-                if selectedAction == .createTask {
-                    Button("Create + schedule") {
-                        let task = appState.addTask(title: draft.title, course: draft.course, dueDate: draft.dueDate)
-                        let components = Calendar.current.dateComponents([.hour, .minute], from: draft.dueDate)
-                        appState.schedule(task.id, at: Double(components.hour ?? 16) + Double(components.minute ?? 0) / 60, on: draft.dueDate)
-                        onDismiss()
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
-            .controlSize(.small)
         }
-        .padding(14)
     }
+
+    private func tokenColor(_ token: CommandToken) -> Color {
+        switch token.kind {
+        case .date: return HubPalette.hubAccent
+        case .time: return Color(red: 0.95, green: 0.5, blue: 0.2)
+        case .course: return draft.course.accent
+        }
+    }
+
+    @ViewBuilder
+    private var metadataBlock: some View {
+        switch selectedAction {
+        case .capture:
+            VStack(spacing: 0) {
+                metadataRow(icon: "tray.full.fill", iconColor: HubPalette.success, label: "Destination", value: "Scratchpad")
+                Divider().padding(.leading, 36)
+                metadataRow(icon: "clock", iconColor: HubPalette.secondaryText, label: "Saved", value: "Now")
+            }
+            .background(Color.hubGroupedSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        case .createNote:
+            VStack(spacing: 0) {
+                metadataRow(icon: "folder.fill", iconColor: draft.course.accent, label: "Folder", value: draft.course.title)
+                Divider().padding(.leading, 36)
+                metadataRow(icon: "doc.text.fill", iconColor: HubPalette.success, label: "Format", value: "Markdown")
+            }
+            .background(Color.hubGroupedSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        case .startTimer:
+            VStack(spacing: 0) {
+                metadataRow(icon: "timer", iconColor: selectedAction.tint, label: "Mode", value: timerModeLabel)
+                Divider().padding(.leading, 36)
+                metadataRow(icon: "play.fill", iconColor: HubPalette.success, label: "Starts", value: "Immediately")
+            }
+            .background(Color.hubGroupedSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        case .searchNotes, .searchFiles:
+            metadataRow(
+                icon: "magnifyingglass",
+                iconColor: selectedAction.tint,
+                label: "Results",
+                value: "\(searchResultCount) found"
+            )
+            .background(Color.hubGroupedSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        default:
+            datedMetadata
+        }
+    }
+
+    private var datedMetadata: some View {
+        VStack(spacing: 0) {
+            metadataRow(icon: "tag.fill", iconColor: draft.course.accent, label: "Space", value: draft.course.title)
+            Divider().padding(.leading, 36)
+            metadataRow(icon: "calendar", iconColor: HubPalette.hubAccent, label: selectedAction == .addProject ? "Deadline" : "When", value: metadataDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))
+            if let note = draft.linkedNote {
+                Divider().padding(.leading, 36)
+                metadataRow(icon: "doc.text.fill", iconColor: Color(red: 0.4, green: 0.7, blue: 0.4), label: "Linked note", value: note)
+            }
+        }
+        .background(Color.hubGroupedSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func metadataRow(icon: String, iconColor: Color, label: String, value: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.callout)
+                .foregroundStyle(iconColor)
+                .frame(width: 24)
+            Text(label)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(HubPalette.primaryText)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 10) {
+            Button(action: executeAction) {
+                Text(buttonLabel)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .background(LinearGradient(
+                        colors: [selectedAction.tint, selectedAction.tint.opacity(0.85)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.defaultAction)
+
+            if selectedAction == .createTask {
+                Button {
+                    let task = appState.addTask(title: draft.title, course: draft.course, dueDate: draft.dueDate)
+                    let components = Calendar.current.dateComponents([.hour, .minute], from: draft.dueDate)
+                    appState.schedule(task.id, at: Double(components.hour ?? 16) + Double(components.minute ?? 0) / 60, on: draft.dueDate)
+                    onDismiss()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar.badge.plus")
+                        Text("Schedule")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HubPalette.hubAccent)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 38)
+                    .background(HubPalette.hubAccent.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var buttonLabel: String {
+        switch selectedAction {
+        case .createTask: return "Create task"
+        case .capture: return "Save to scratchpad"
+        case .reschedule: return "Reschedule"
+        case .schedule: return "Add to calendar"
+        case .addProject: return "Create project"
+        case .createNote: return "Create note"
+        case .startTimer: return "Start timer"
+        case .searchNotes: return "Search notes"
+        case .searchFiles: return "Search files"
+        }
+    }
+
+    // MARK: - Footer
 
     private var footer: some View {
-        HStack {
-            Text("↵ Run")
+        HStack(spacing: 20) {
+            HStack(spacing: 6) {
+                kbd("↵")
+                Text("Run")
+            }
+            HStack(spacing: 6) {
+                kbd("↑↓")
+                Text("Switch action")
+            }
+            HStack(spacing: 6) {
+                kbd("esc")
+                Text("Close")
+            }
             Spacer()
-            Text("⌥ Space")
-            Spacer()
-            Text("⌘K Actions")
+            HStack(spacing: 6) {
+                kbd("⌥ Space")
+                Text("Toggle")
+            }
         }
-        .font(.caption)
+        .font(.system(size: 11, weight: .medium))
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 16)
-        .frame(height: 40)
+        .padding(.horizontal, 18)
+        .frame(height: 42)
         .overlay(alignment: .top) { Divider() }
     }
+
+    private func kbd(_ s: String) -> some View {
+        Text(s)
+            .font(.system(size: 10, weight: .bold, design: .rounded))
+            .foregroundStyle(HubPalette.secondaryText)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.hubGroupedSecondary)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .stroke(HubPalette.separator, lineWidth: 0.5)
+            )
+    }
+
+    // MARK: - Actions
 
     private func executeAction() {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -239,7 +512,11 @@ struct QuickCommandView: View {
         case .createTask:
             appState.createTask(from: draft)
         case .capture:
-            appState.addCapture(trimmed)
+            guard !captureText.isEmpty else {
+                appState.statusMessage = "Type something to capture"
+                return
+            }
+            appState.addCapture(captureText)
         case .reschedule:
             guard case .rescheduleTask(let query) = interpretation.intent else {
                 appState.statusMessage = "Try: move Essay draft to tomorrow 4 pm"
@@ -258,12 +535,16 @@ struct QuickCommandView: View {
             appState.schedule(task.id, at: hour, on: draft.dueDate)
             appState.navigate(to: .calendar)
         case .addProject:
-            appState.addProject(title: draft.title, course: draft.course, deadline: draft.dueDate)
+            let project = appState.addProject(title: projectTitle, course: draft.course, deadline: projectDeadline)
+            appState.statusMessage = "Created project \(project.title)"
             appState.navigate(to: .projects)
         case .createNote:
-            let note = appState.addNote(title: draft.title, folder: draft.course.title, course: draft.course)
+            let note = appState.addNote(title: noteTitle, folder: draft.course.title, course: draft.course)
             appState.openNote(note.id)
             appState.navigate(to: .notes)
+        case .startTimer:
+            appState.startFocusTimer(selectedTimerCommand)
+            appState.navigate(to: .pomodoro)
         case .searchNotes:
             if let note = appState.notes.first(where: { $0.title.localizedCaseInsensitiveContains(trimmed) || $0.markdown.localizedCaseInsensitiveContains(trimmed) }) {
                 appState.openNote(note.id)
@@ -277,31 +558,135 @@ struct QuickCommandView: View {
         }
         onDismiss()
     }
+
+    private var captureText: String {
+        if case .capture(let text) = interpretation.intent { return text }
+        return input.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var projectTitle: String { draft.title == "Untitled task" ? "Untitled project" : draft.title }
+    private var noteTitle: String { draft.title == "Untitled task" ? "Untitled note" : draft.title }
+    private var projectDeadline: Date {
+        draft.recognizedTokens.contains(where: { $0.kind == .date })
+            ? draft.dueDate
+            : (Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date())
+    }
+
+    private var searchResultCount: Int {
+        let query = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch selectedAction {
+        case .searchNotes:
+            return appState.notes.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.markdown.localizedCaseInsensitiveContains(query) }.count
+        case .searchFiles:
+            return appState.files.filter { $0.displayName.localizedCaseInsensitiveContains(query) || $0.annotationNotes.localizedCaseInsensitiveContains(query) }.count
+        default:
+            return 0
+        }
+    }
+
+    private var previewTokens: [CommandToken] {
+        switch selectedAction {
+        case .capture, .startTimer, .searchNotes, .searchFiles: []
+        default: draft.recognizedTokens
+        }
+    }
+
+    private var selectedActionUsesDate: Bool {
+        switch selectedAction {
+        case .createTask, .reschedule, .schedule, .addProject: true
+        case .capture, .createNote, .startTimer, .searchNotes, .searchFiles: false
+        }
+    }
+
+    private var metadataDate: Date { selectedAction == .addProject ? projectDeadline : draft.dueDate }
+
+    private func updateSuggestedAction() {
+        if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            selectedAction = .createTask
+            return
+        }
+        switch interpretation.intent {
+        case .capture: selectedAction = .capture
+        case .createProject: selectedAction = .addProject
+        case .createNote: selectedAction = .createNote
+        case .rescheduleTask: selectedAction = .reschedule
+        case .search: break
+        case .startTimer: selectedAction = .startTimer
+        case .createTask:
+            if selectedAction == .reschedule || selectedAction == .startTimer { selectedAction = .createTask }
+        }
+    }
+
+    private func moveSelection(by offset: Int) {
+        let actions = Action.allCases
+        guard let index = actions.firstIndex(of: selectedAction) else { return }
+        selectedAction = actions[(index + offset + actions.count) % actions.count]
+    }
+
+    private func reset() {
+        input = ""
+        selectedAction = .createTask
+        DispatchQueue.main.async { inputFocused = true }
+    }
+
+    private var selectedTimerCommand: FocusTimerCommand {
+        if case .startTimer(let command) = interpretation.intent { return command }
+        return .countdown(seconds: 25 * 60)
+    }
+
+    private var timerModeLabel: String {
+        switch selectedTimerCommand {
+        case .countdown(let seconds): "Countdown · \(durationLabel(seconds))"
+        case .stopwatch: "Stopwatch · count up"
+        }
+    }
+
+    private func durationLabel(_ seconds: Int) -> String {
+        if seconds.isMultiple(of: 3600) { return "\(seconds / 3600) hr" }
+        if seconds.isMultiple(of: 60) { return "\(seconds / 60) min" }
+        return "\(seconds) sec"
+    }
 }
+
+// MARK: - Action row
 
 private struct QuickActionRow: View {
     let title: String
     let icon: String
-    var isSelected = false
+    let tint: Color
+    var isSelected: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .frame(width: 18)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(tint.opacity(isSelected ? 0.22 : 0.10))
+                    .frame(width: 26, height: 26)
+                    .overlay(
+                        Image(systemName: icon)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(tint)
+                    )
                 Text(title)
+                    .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(HubPalette.primaryText)
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if isSelected {
+                    Image(systemName: "arrow.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(tint)
+                }
             }
-            .padding(.horizontal, 12)
-            .frame(height: 32)
-            .background(isSelected ? Color.hubGroupedSecondary : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? HubPalette.selected : Color.clear)
+            )
+            .padding(.horizontal, 10)
         }
         .buttonStyle(.plain)
+        .animation(.easeOut(duration: 0.14), value: isSelected)
     }
 }
