@@ -10,6 +10,8 @@ struct IPhoneNoteEditorView: View {
 
     @State private var draft: HubNote?
     @State private var autosaveTask: Task<Void, Never>?
+    @State private var markdownSelection = NSRange(location: 0, length: 0)
+    @State private var exportURLs: [URL] = []
 
     private var note: HubNote? { appState.notes.first(where: { $0.id == noteID }) }
 
@@ -59,7 +61,7 @@ struct IPhoneNoteEditorView: View {
                                     d.markdown = newValue
                                     self.draft = d
                                 }
-                            ), targetLine: nil)
+                            ), targetLine: nil, onSelectionChange: { markdownSelection = $0 })
                             .frame(minHeight: 360)
                         }
                         Section("Markdown tools") {
@@ -75,9 +77,22 @@ struct IPhoneNoteEditorView: View {
                                     }
                                 }
                             }
-                            Text("Tap a tool to insert an editable example.")
+                            Text("Select text to format it, or insert at the cursor.")
                                 .font(.caption)
                                 .foregroundStyle(HubPalette.secondaryText)
+                        }
+                        Section("Export") {
+                            Button {
+                                appState.updateNote(draft)
+                                exportURLs = appState.exportNote(draft)
+                            } label: {
+                                Label("Create PDF, Word-compatible RTF & CSV", systemImage: "square.and.arrow.up")
+                            }
+                            if !exportURLs.isEmpty {
+                                ShareLink(items: exportURLs) {
+                                    Label("Share exported files", systemImage: "square.and.arrow.up.on.square")
+                                }
+                            }
                         }
                     }
                 } else {
@@ -124,8 +139,9 @@ struct IPhoneNoteEditorView: View {
 
     private func insert(_ tool: MarkdownTool) {
         guard var draft else { return }
-        let leadingNewline = !draft.markdown.isEmpty && !draft.markdown.hasSuffix("\n") ? "\n" : ""
-        draft.markdown += leadingNewline + tool.snippet
+        let result = tool.applying(to: draft.markdown, selection: markdownSelection)
+        draft.markdown = result.text
+        markdownSelection = result.selection
         self.draft = draft
     }
 

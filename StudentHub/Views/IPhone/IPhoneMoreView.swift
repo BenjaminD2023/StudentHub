@@ -153,12 +153,16 @@ struct IPhoneSpacesView: View {
                         .accessibilityLabel("Edit \(space.title)")
                     }
                 }
+                .onMove(perform: appState.moveSpaces)
             } footer: {
                 Text("Open a Space for its tasks, notes, projects, and files. Edit lets you rename, recolor, or delete it directly.")
             }
         }
         .navigationTitle("Spaces")
         .toolbar {
+            #if os(iOS)
+            ToolbarItem(placement: .topBarLeading) { EditButton() }
+            #endif
             ToolbarItem(placement: .primaryAction) {
                 Button { isCreatingSpace = true } label: { Image(systemName: "plus") }
             }

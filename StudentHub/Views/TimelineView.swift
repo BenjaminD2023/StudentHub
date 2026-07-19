@@ -387,7 +387,7 @@ struct DayTimelineView: View {
                     hourGrid
                     scheduleBlocksLayer
                 }
-                .frame(height: rowHeight * 13)
+                .frame(height: rowHeight * 16)
             }
             .background(HubPalette.grouped)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -427,7 +427,7 @@ struct DayTimelineView: View {
 
     private var hourGrid: some View {
         VStack(spacing: 0) {
-            ForEach(8..<21, id: \.self) { hour in
+            ForEach(8..<24, id: \.self) { hour in
                 HStack(spacing: 12) {
                     Text(formatHour(hour))
                         .font(.system(size: 10, design: .monospaced))

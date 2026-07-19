@@ -1,4 +1,11 @@
 import Foundation
+import CoreGraphics
+import CoreText
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 enum WorkspaceStorage {
     private static var storageName: String {
@@ -148,6 +155,131 @@ enum WorkspaceStorage {
         try csv.write(to: csvURL, atomically: true, encoding: .utf8)
         try markdown.write(to: mdURL, atomically: true, encoding: .utf8)
         return [csvURL, mdURL]
+    }
+
+    static func export(note: HubNote) throws -> [URL] {
+        try prepareDirectories()
+        let baseName = safeFileName(note.title.isEmpty ? "Untitled note" : note.title)
+        let rtfURL = exportsURL.appendingPathComponent(baseName).appendingPathExtension("rtf")
+        let pdfURL = exportsURL.appendingPathComponent(baseName).appendingPathExtension("pdf")
+        let csvURL = exportsURL.appendingPathComponent(baseName + "-tables").appendingPathExtension("csv")
+        let attributed = attributedDocument(for: note)
+
+        let rtf = try attributed.data(
+            from: NSRange(location: 0, length: attributed.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        )
+        try rtf.write(to: rtfURL, options: .atomic)
+        try pdfData(from: attributed).write(to: pdfURL, options: .atomic)
+        try csvFromMarkdownTables(note.markdown).write(to: csvURL, atomically: true, encoding: .utf8)
+        return [pdfURL, rtfURL, csvURL]
+    }
+
+    static func csvFromMarkdownTables(_ markdown: String) -> String {
+        let lines = markdown.components(separatedBy: .newlines)
+        var tables: [[[String]]] = []
+        var index = 0
+        while index + 1 < lines.count {
+            let header = tableCells(in: lines[index])
+            let separator = tableCells(in: lines[index + 1])
+            let isSeparator = !separator.isEmpty && separator.allSatisfy {
+                $0.replacingOccurrences(of: ":", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                    .allSatisfy { $0 == "-" }
+            }
+            guard !header.isEmpty, header.count == separator.count, isSeparator else {
+                index += 1
+                continue
+            }
+
+            var rows = [header]
+            index += 2
+            while index < lines.count {
+                let cells = tableCells(in: lines[index])
+                guard !cells.isEmpty else { break }
+                rows.append(cells)
+                index += 1
+            }
+            tables.append(rows)
+        }
+
+        if tables.isEmpty {
+            return "Note\n" + csvEscape(markdown.replacingOccurrences(of: "\n", with: " ")) + "\n"
+        }
+        return tables.enumerated().map { tableIndex, rows in
+            let prefix = tables.count > 1 ? "Table \(tableIndex + 1)\n" : ""
+            return prefix + rows.map { $0.map(csvEscape).joined(separator: ",") }.joined(separator: "\n")
+        }.joined(separator: "\n\n") + "\n"
+    }
+
+    private static func attributedDocument(for note: HubNote) -> NSAttributedString {
+        let document = NSMutableAttributedString()
+        #if os(macOS)
+        let titleFont = NSFont.systemFont(ofSize: 26, weight: .bold)
+        let bodyFont = NSFont.systemFont(ofSize: 14)
+        let textColor = NSColor.labelColor
+        #else
+        let titleFont = UIFont.systemFont(ofSize: 26, weight: .bold)
+        let bodyFont = UIFont.systemFont(ofSize: 14)
+        let textColor = UIColor.label
+        #endif
+        document.append(NSAttributedString(
+            string: note.title + "\n\n",
+            attributes: [.font: titleFont, .foregroundColor: textColor]
+        ))
+        let body = (try? AttributedString(markdown: note.markdown))
+            .map(NSAttributedString.init) ?? NSAttributedString(string: note.markdown)
+        let mutableBody = NSMutableAttributedString(attributedString: body)
+        if mutableBody.length > 0 {
+            let bodyRange = NSRange(location: 0, length: mutableBody.length)
+            mutableBody.addAttribute(.foregroundColor, value: textColor, range: bodyRange)
+            mutableBody.enumerateAttribute(.font, in: bodyRange) { value, range, _ in
+                if value == nil { mutableBody.addAttribute(.font, value: bodyFont, range: range) }
+            }
+        }
+        document.append(mutableBody)
+        return document
+    }
+
+    private static func pdfData(from attributed: NSAttributedString) throws -> Data {
+        let data = NSMutableData()
+        var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+        guard let consumer = CGDataConsumer(data: data),
+              let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        let framesetter = CTFramesetterCreateWithAttributedString(attributed)
+        var location = 0
+        repeat {
+            context.beginPDFPage(nil)
+            context.saveGState()
+            context.translateBy(x: 0, y: mediaBox.height)
+            context.scaleBy(x: 1, y: -1)
+            let path = CGPath(rect: mediaBox.insetBy(dx: 54, dy: 54), transform: nil)
+            let frame = CTFramesetterCreateFrame(
+                framesetter,
+                CFRange(location: location, length: 0),
+                path,
+                nil
+            )
+            CTFrameDraw(frame, context)
+            let visible = CTFrameGetVisibleStringRange(frame)
+            location += visible.length
+            context.restoreGState()
+            context.endPDFPage()
+            if visible.length == 0 { break }
+        } while location < attributed.length
+        context.closePDF()
+        return data as Data
+    }
+
+    private static func tableCells(in line: String) -> [String] {
+        guard line.contains("|") else { return [] }
+        var value = line.trimmingCharacters(in: .whitespaces)
+        if value.hasPrefix("|") { value.removeFirst() }
+        if value.hasSuffix("|") { value.removeLast() }
+        return value.split(separator: "|", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
     }
 
     private static func safeFileName(_ value: String) -> String {

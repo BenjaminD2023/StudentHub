@@ -206,6 +206,11 @@ final class AppState: ObservableObject {
         persist()
     }
 
+    func moveSpaces(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        spaces.move(fromOffsets: offsets, toOffset: destination)
+        persist()
+    }
+
     func deleteSpace(_ id: String, reassignTo replacementID: String) {
         guard spaces.count > 1,
               let replacement = spaces.first(where: { $0.id == replacementID && $0.id != id }),
@@ -440,6 +445,21 @@ final class AppState: ObservableObject {
         scheduleBlocks.append(
             ScheduleBlock(title: title, subtitle: course.title, course: course, startHour: startHour, duration: duration, date: date)
         )
+        persist()
+    }
+
+    func updateScheduleBlock(_ block: ScheduleBlock) {
+        guard let index = scheduleBlocks.firstIndex(where: { $0.id == block.id }) else { return }
+        var updated = block
+        updated.course = canonicalSpace(block.course)
+        updated.subtitle = updated.course.title
+        updated.startHour = min(24 - 1.0 / 60.0, max(0, block.startHour))
+        updated.duration = min(24 - updated.startHour, max(1.0 / 60.0, block.duration))
+        scheduleBlocks[index] = updated
+        if let taskID = updated.linkedTaskID,
+           let taskIndex = tasks.firstIndex(where: { $0.id == taskID }) {
+            tasks[taskIndex].scheduledHour = updated.startHour
+        }
         persist()
     }
 
@@ -716,6 +736,19 @@ final class AppState: ObservableObject {
         }
     }
 
+    @discardableResult
+    func exportNote(_ note: HubNote) -> [URL] {
+        do {
+            let urls = try WorkspaceStorage.export(note: note)
+            lastExportURLs = urls
+            statusMessage = "Exported PDF, RTF, and CSV"
+            return urls
+        } catch {
+            statusMessage = "Note export failed: \(error.localizedDescription)"
+            return []
+        }
+    }
+
     // MARK: - Pomodoro
 
     func togglePomodoro() {
@@ -748,7 +781,7 @@ final class AppState: ObservableObject {
         pomodoroTimer = nil
         pomodoroRunning = false
         focusTimerMode = .countdown
-        pomodoroRemaining = minutes * 60
+        pomodoroRemaining = min(24 * 60, max(1, minutes)) * 60
         countdownEndDate = nil
         persist()
     }

@@ -4,6 +4,7 @@ struct NotesWorkspaceView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.openWindow) private var openWindow
     @State private var selectedFolder: String?
+    @State private var selectedSpaceID: String?
     @State private var searchText = ""
     @State private var isNavigatorVisible = true
     @State private var isFocusMode = false
@@ -16,11 +17,17 @@ struct NotesWorkspaceView: View {
     private var visibleNotes: [HubNote] {
         appState.notes
             .filter { selectedFolder == nil || $0.folder == selectedFolder }
+            .filter { selectedSpaceID == nil || $0.course.id == selectedSpaceID }
             .filter {
                 let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
                 return query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || $0.markdown.localizedCaseInsensitiveContains(query)
             }
             .sorted { $0.modifiedAt > $1.modifiedAt }
+    }
+
+    private var selectedSpace: Course? {
+        guard let selectedSpaceID else { return nil }
+        return appState.spaces.first(where: { $0.id == selectedSpaceID })
     }
 
     var body: some View {
@@ -68,7 +75,12 @@ struct NotesWorkspaceView: View {
                     Text("Library").font(.title3.bold())
                 }
                 Spacer()
-                Button { _ = appState.addNote(folder: selectedFolder ?? "Inbox") } label: {
+                Button {
+                    _ = appState.addNote(
+                        folder: selectedFolder ?? "Inbox",
+                        course: selectedSpace ?? appState.defaultSpace
+                    )
+                } label: {
                     Image(systemName: "square.and.pencil")
                         .frame(width: 28, height: 28)
                         .background(HubPalette.grouped)
@@ -99,6 +111,24 @@ struct NotesWorkspaceView: View {
             .padding(.bottom, 12)
 
             HStack(spacing: 8) {
+                Menu {
+                    Button("All Spaces", systemImage: selectedSpaceID == nil ? "checkmark" : "rectangle.3.group") {
+                        selectSpace(nil)
+                    }
+                    Divider()
+                    ForEach(appState.spaces) { space in
+                        Button(space.title, systemImage: selectedSpaceID == space.id ? "checkmark" : "circle.fill") {
+                            selectSpace(space.id)
+                        }
+                    }
+                } label: {
+                    Label(selectedSpace?.title ?? "All Spaces", systemImage: "rectangle.3.group")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                #if os(macOS)
+                .menuStyle(.borderlessButton)
+                #endif
+
                 Menu {
                     Button("All notes", systemImage: selectedFolder == nil ? "checkmark" : "tray.full") {
                         selectFolder(nil)
@@ -158,6 +188,16 @@ struct NotesWorkspaceView: View {
         selectedFolder = folder
         let candidates = appState.notes
             .filter { folder == nil || $0.folder == folder }
+            .filter { selectedSpaceID == nil || $0.course.id == selectedSpaceID }
+            .sorted { $0.modifiedAt > $1.modifiedAt }
+        if let first = candidates.first { appState.openNote(first.id) }
+    }
+
+    private func selectSpace(_ spaceID: String?) {
+        selectedSpaceID = spaceID
+        let candidates = appState.notes
+            .filter { spaceID == nil || $0.course.id == spaceID }
+            .filter { selectedFolder == nil || $0.folder == selectedFolder }
             .sorted { $0.modifiedAt > $1.modifiedAt }
         if let first = candidates.first { appState.openNote(first.id) }
     }
@@ -183,6 +223,8 @@ struct NotesWorkspaceView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(note.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
                     HStack(spacing: 5) {
+                        Text(note.course.title)
+                        Text("·")
                         Text(note.folder)
                         Text("·")
                         Text(note.modifiedAt.formatted(date: .abbreviated, time: .omitted))
@@ -280,7 +322,9 @@ struct MarkdownNoteEditor: View {
     @State private var isReadingMode = false
     @State private var showsMarkdownTools = false
     @State private var targetHeadingLine: Int?
+    @State private var markdownSelection = NSRange(location: 0, length: 0)
     @State private var autosaveTask: Task<Void, Never>?
+    @State private var exportURLs: [URL] = []
     private let allowsPopOut: Bool
 
     init(note: HubNote, allowsPopOut: Bool = true) {
@@ -382,7 +426,11 @@ struct MarkdownNoteEditor: View {
                     MarkdownReadingView(source: draft.markdown, targetLine: targetHeadingLine)
                         .accessibilityLabel("Markdown reading view")
                 } else {
-                    ObsidianLiveMarkdownEditor(text: $draft.markdown, targetLine: targetHeadingLine)
+                    ObsidianLiveMarkdownEditor(
+                        text: $draft.markdown,
+                        targetLine: targetHeadingLine,
+                        onSelectionChange: { markdownSelection = $0 }
+                    )
                         .accessibilityLabel("Markdown live preview editor")
                 }
             }
@@ -467,6 +515,18 @@ struct MarkdownNoteEditor: View {
                 save(showStatus: false)
                 if let url = appState.noteURL(draft.id) { OpenURLHelper.reveal(url) }
             }
+            Button("Export PDF, RTF & CSV", systemImage: "square.and.arrow.up") {
+                save(showStatus: false)
+                exportURLs = appState.exportNote(draft)
+            }
+            if !exportURLs.isEmpty {
+                Divider()
+                ForEach(exportURLs, id: \.self) { url in
+                    Button("Open \(url.lastPathComponent)", systemImage: "doc") {
+                        OpenURLHelper.open(url)
+                    }
+                }
+            }
             Divider()
             Button("Delete note", systemImage: "trash", role: .destructive) {
                 appState.deleteNote(draft.id)
@@ -488,8 +548,9 @@ struct MarkdownNoteEditor: View {
     }
 
     private func insert(_ tool: MarkdownTool) {
-        let needsLeadingNewline = !draft.markdown.isEmpty && !draft.markdown.hasSuffix("\n")
-        draft.markdown += (needsLeadingNewline ? "\n" : "") + tool.snippet
+        let result = tool.applying(to: draft.markdown, selection: markdownSelection)
+        draft.markdown = result.text
+        markdownSelection = result.selection
         isReadingMode = false
     }
 
@@ -536,6 +597,7 @@ enum MarkdownTool: String, CaseIterable, Identifiable {
     case link
     case quote
     case code
+    case table
     case divider
 
     var id: String { rawValue }
@@ -549,6 +611,7 @@ enum MarkdownTool: String, CaseIterable, Identifiable {
         case .link: "Link"
         case .quote: "Quote"
         case .code: "Code"
+        case .table: "Table"
         case .divider: "Divider"
         }
     }
@@ -562,6 +625,7 @@ enum MarkdownTool: String, CaseIterable, Identifiable {
         case .link: "link"
         case .quote: "text.quote"
         case .code: "chevron.left.forwardslash.chevron.right"
+        case .table: "tablecells"
         case .divider: "minus"
         }
     }
@@ -575,11 +639,66 @@ enum MarkdownTool: String, CaseIterable, Identifiable {
         case .link: "[label](https://example.com)"
         case .quote: "> quote"
         case .code: "`code`"
+        case .table: "| Column 1 | Column 2 |\n| --- | --- |\n| Value | Value |"
         case .divider: "---"
         }
     }
 
     var snippet: String { syntax + "\n" }
+
+    func applying(to source: String, selection: NSRange) -> MarkdownEditResult {
+        let sourceLength = (source as NSString).length
+        let location = selection.location == NSNotFound ? sourceLength : min(selection.location, sourceLength)
+        let length = min(selection.length, sourceLength - location)
+        let safeRange = NSRange(location: location, length: length)
+        let selectedText = (source as NSString).substring(with: safeRange)
+
+        let replacement: String
+        if safeRange.length == 0 {
+            replacement = snippet
+        } else {
+            switch self {
+            case .heading:
+                replacement = prefixLines(selectedText, with: "## ")
+            case .bold:
+                replacement = "**\(selectedText)**"
+            case .italic:
+                replacement = "*\(selectedText)*"
+            case .checklist:
+                replacement = prefixLines(selectedText, with: "- [ ] ")
+            case .link:
+                replacement = "[\(selectedText)](https://example.com)"
+            case .quote:
+                replacement = prefixLines(selectedText, with: "> ")
+            case .code:
+                replacement = selectedText.contains("\n")
+                    ? "```\n\(selectedText)\n```"
+                    : "`\(selectedText)`"
+            case .table:
+                replacement = snippet
+            case .divider:
+                replacement = "\(selectedText)\n---\n"
+            }
+        }
+
+        let mutable = NSMutableString(string: source)
+        mutable.replaceCharacters(in: safeRange, with: replacement)
+        return MarkdownEditResult(
+            text: mutable as String,
+            selection: NSRange(location: location + (replacement as NSString).length, length: 0)
+        )
+    }
+
+    private func prefixLines(_ text: String, with prefix: String) -> String {
+        text.components(separatedBy: .newlines)
+            .map { prefix + $0 }
+            .joined(separator: "\n")
+    }
+}
+
+struct MarkdownEditResult: Equatable {
+    let text: String
+    let selection: NSRange
 }
 
 private struct MarkdownToolsPanel: View {
@@ -589,7 +708,7 @@ private struct MarkdownToolsPanel: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Markdown tools").font(.headline)
-                Text("Choose a format to insert an editable example.")
+                Text("Select existing text to format it, or insert at the cursor.")
                     .font(.caption)
                     .foregroundStyle(HubPalette.secondaryText)
             }

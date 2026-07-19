@@ -300,4 +300,65 @@ final class StudentHubTests: XCTestCase {
         XCTAssertEqual(decoded.title, "Ideas")
         XCTAssertEqual(decoded.body, "Unsorted thoughts")
     }
+
+    @MainActor
+    func testSpacesCanBeReorderedAndNewSpaceAcceptsNotes() throws {
+        let state = AppState(seedData: false, persistenceEnabled: false)
+        let writing = try XCTUnwrap(state.addSpace(title: "Writing", colorHex: 0xA978F2))
+
+        state.moveSpaces(
+            fromOffsets: IndexSet(integer: state.spaces.count - 1),
+            toOffset: 0
+        )
+        let note = state.addNote(title: "Essay plan", course: writing)
+
+        XCTAssertEqual(state.spaces.first, writing)
+        XCTAssertEqual(state.notes.first(where: { $0.id == note.id })?.course, writing)
+    }
+
+    func testMarkdownToolsFormatExistingSelectionAndCreateTables() {
+        let source = "Review these words today"
+        let selected = (source as NSString).range(of: "these words")
+        let bold = MarkdownTool.bold.applying(to: source, selection: selected)
+        let table = MarkdownTool.table.applying(
+            to: "",
+            selection: NSRange(location: 0, length: 0)
+        )
+
+        XCTAssertEqual(bold.text, "Review **these words** today")
+        XCTAssertTrue(table.text.contains("| Column 1 | Column 2 |"))
+    }
+
+    func testMarkdownTableExportsAsExcelCompatibleCSV() {
+        let markdown = """
+        | Assignment | Due |
+        | --- | --- |
+        | Lab report | Friday |
+        """
+
+        let csv = WorkspaceStorage.csvFromMarkdownTables(markdown)
+
+        XCTAssertEqual(csv, "\"Assignment\",\"Due\"\n\"Lab report\",\"Friday\"\n")
+    }
+
+    @MainActor
+    func testCustomPomodoroAndExactCalendarUpdate() throws {
+        let state = AppState(seedData: false, persistenceEnabled: false)
+        state.resetPomodoro(minutes: 42)
+        state.addScheduleBlock(
+            title: "Late study",
+            course: .general,
+            date: Date(),
+            startHour: 22 + 7.0 / 60.0,
+            duration: 53.0 / 60.0
+        )
+        var block = try XCTUnwrap(state.scheduleBlocks.first)
+        block.startHour = 23 + 5.0 / 60.0
+        block.duration = 40.0 / 60.0
+        state.updateScheduleBlock(block)
+
+        XCTAssertEqual(state.pomodoroRemaining, 42 * 60)
+        XCTAssertEqual(state.scheduleBlocks.first?.startHour ?? 0, 23 + 5.0 / 60.0, accuracy: 0.0001)
+        XCTAssertEqual(state.scheduleBlocks.first?.duration ?? 0, 40.0 / 60.0, accuracy: 0.0001)
+    }
 }

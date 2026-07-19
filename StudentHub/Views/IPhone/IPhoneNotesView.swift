@@ -60,6 +60,26 @@ struct IPhoneNotesView: View {
                     }
                 }
 
+                Section("Spaces") {
+                    ForEach(appState.spaces) { space in
+                        let spaceNotes = appState.notes
+                            .filter { $0.course.id == space.id }
+                            .sorted { $0.modifiedAt > $1.modifiedAt }
+                        NavigationLink {
+                            AllNotesList(notes: spaceNotes)
+                                .navigationTitle(space.title)
+                        } label: {
+                            HStack {
+                                Circle().fill(space.accent).frame(width: 10, height: 10)
+                                Text(space.title)
+                                Spacer()
+                                Text("\(spaceNotes.count)")
+                                    .foregroundStyle(HubPalette.tertiaryText)
+                            }
+                        }
+                    }
+                }
+
                 Section("Recent") {
                     if recentNotes.isEmpty {
                         EmptyStateView(
@@ -123,7 +143,7 @@ struct IPhoneNotesView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(HubPalette.primaryText)
                     .lineLimit(1)
-                Text("\(note.folder) · \(note.modifiedAt.formatted(date: .abbreviated, time: .shortened))")
+                Text("\(note.course.title) · \(note.folder) · \(note.modifiedAt.formatted(date: .abbreviated, time: .shortened))")
                     .font(.system(size: 12))
                     .foregroundStyle(HubPalette.secondaryText)
                     .lineLimit(1)

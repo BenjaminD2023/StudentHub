@@ -5,6 +5,7 @@ import SwiftUI
 struct IPadNotesView: View {
     @EnvironmentObject private var appState: AppState
     @State private var selectedFolder: String? = nil
+    @State private var selectedSpaceID: String? = nil
     @State private var editingNoteID: UUID?
 
     private var folders: [String] {
@@ -14,7 +15,9 @@ struct IPadNotesView: View {
     private var notes: [HubNote] {
         let base = appState.notes
         let filtered: [HubNote]
-        if let folder = selectedFolder {
+        if let selectedSpaceID {
+            filtered = base.filter { $0.course.id == selectedSpaceID }
+        } else if let folder = selectedFolder {
             filtered = base.filter { $0.folder == folder }
         } else {
             filtered = base
@@ -29,6 +32,7 @@ struct IPadNotesView: View {
                 Section("All") {
                     Button {
                         selectedFolder = nil
+                        selectedSpaceID = nil
                     } label: {
                         Label("All Notes", systemImage: "tray.full")
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -44,6 +48,7 @@ struct IPadNotesView: View {
                         let count = appState.notes.filter { $0.folder == folder }.count
                         Button {
                             selectedFolder = folder
+                            selectedSpaceID = nil
                         } label: {
                             HStack {
                                 Label(folder, systemImage: "folder")
@@ -58,6 +63,27 @@ struct IPadNotesView: View {
                         )
                     }
                 }
+                Section("Spaces") {
+                    ForEach(appState.spaces) { space in
+                        let count = appState.notes.filter { $0.course.id == space.id }.count
+                        Button {
+                            selectedSpaceID = space.id
+                            selectedFolder = nil
+                        } label: {
+                            HStack {
+                                Circle().fill(space.accent).frame(width: 8, height: 8)
+                                Text(space.title)
+                                Spacer()
+                                Text("\(count)").foregroundStyle(HubPalette.tertiaryText)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(
+                            selectedSpaceID == space.id ? HubPalette.hubAccent.opacity(0.12) : Color.clear
+                        )
+                    }
+                }
             }
             .listStyle(.sidebar)
             .frame(width: 240)
@@ -67,11 +93,12 @@ struct IPadNotesView: View {
             // Notes list for selected folder
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Text(selectedFolder ?? "All Notes")
+                    Text(selectedSpaceTitle ?? selectedFolder ?? "All Notes")
                         .font(.system(size: 22, weight: .bold))
                     Spacer()
                     Button {
-                        let note = appState.addNote(folder: selectedFolder ?? "Inbox")
+                        let course = appState.spaces.first(where: { $0.id == selectedSpaceID }) ?? appState.defaultSpace
+                        let note = appState.addNote(folder: selectedFolder ?? "Inbox", course: course)
                         editingNoteID = note.id
                     } label: {
                         Label("New Note", systemImage: "plus")
@@ -84,7 +111,7 @@ struct IPadNotesView: View {
                 if notes.isEmpty {
                     EmptyStateView(
                         systemImage: "doc.text",
-                        title: "No notes in \(selectedFolder ?? "this folder")",
+                        title: "No notes in \(selectedSpaceTitle ?? selectedFolder ?? "this collection")",
                         message: "Tap New Note to write one."
                     )
                 } else {
@@ -128,5 +155,9 @@ struct IPadNotesView: View {
             get: { editingNoteID.map(IdentifiableNote.init(id:)) },
             set: { editingNoteID = $0?.id }
         )
+    }
+
+    private var selectedSpaceTitle: String? {
+        appState.spaces.first(where: { $0.id == selectedSpaceID })?.title
     }
 }

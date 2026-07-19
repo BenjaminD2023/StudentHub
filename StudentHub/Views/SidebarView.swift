@@ -164,13 +164,19 @@ private struct SpaceManagerView: View {
 
                 Divider()
 
-                ScrollView {
-                    LazyVStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Drag to reorder", systemImage: "line.3.horizontal")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    List {
                         ForEach(appState.spaces) { space in
                             SpaceEditorRow(space: space)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                                .listRowSeparator(.hidden)
                         }
+                        .onMove(perform: appState.moveSpaces)
                     }
-                    .padding(.vertical, 2)
+                    .listStyle(.plain)
                 }
             }
             .padding(22)
@@ -212,6 +218,9 @@ private struct SpaceEditorRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.secondary)
+                .help("Drag to reorder")
             SpaceColorPicker(selection: $colorHex)
             TextField("Space name", text: $title)
                 .textFieldStyle(.plain)

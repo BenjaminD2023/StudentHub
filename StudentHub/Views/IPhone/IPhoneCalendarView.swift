@@ -5,6 +5,8 @@ import SwiftUI
 struct IPhoneCalendarView: View {
     @EnvironmentObject private var appState: AppState
     @State private var selectedDate: Date = Calendar.current.startOfDay(for: Date())
+    @State private var editingBlock: ScheduleBlock?
+    @State private var isAddingBlock = false
 
     private var weekDays: [Date] {
         let calendar = Calendar.current
@@ -18,7 +20,7 @@ struct IPhoneCalendarView: View {
             .sorted { $0.startHour < $1.startHour }
     }
 
-    private var hours: [Int] { Array(6..<23) }
+    private var hours: [Int] { Array(6..<24) }
 
     var body: some View {
         NavigationStack {
@@ -53,14 +55,25 @@ struct IPhoneCalendarView: View {
             .toolbar {
                 #if os(iOS)
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Today") {
-                        selectedDate = Calendar.current.startOfDay(for: Date())
+                    HStack {
+                        Button("Today") {
+                            selectedDate = Calendar.current.startOfDay(for: Date())
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                        Button { isAddingBlock = true } label: {
+                            Image(systemName: "plus")
+                        }
                     }
-                    .font(.system(size: 15, weight: .semibold))
                 }
                 #endif
             }
             .refreshable { await appState.syncNow() }
+            .sheet(isPresented: $isAddingBlock) {
+                CalendarBlockEditorView(defaultDate: selectedDate)
+            }
+            .sheet(item: $editingBlock) { block in
+                CalendarBlockEditorView(block: block, defaultDate: selectedDate)
+            }
         }
     }
 
@@ -115,8 +128,11 @@ struct IPhoneCalendarView: View {
                             .padding(.top, 7)
                     } else {
                         ForEach(blocksAtHour) { block in
-                            ScheduleBlockCard(block: block, compact: true)
-                                .padding(.vertical, 2)
+                            Button { editingBlock = block } label: {
+                                ScheduleBlockCard(block: block, compact: true)
+                                    .padding(.vertical, 2)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

@@ -13,12 +13,13 @@ import UIKit
 struct ObsidianLiveMarkdownEditor: View {
     @Binding var text: String
     var targetLine: Int?
+    var onSelectionChange: (NSRange) -> Void = { _ in }
 
     var body: some View {
         #if os(macOS)
-        MacLiveMarkdownTextView(text: $text, targetLine: targetLine)
+        MacLiveMarkdownTextView(text: $text, targetLine: targetLine, onSelectionChange: onSelectionChange)
         #else
-        IPhoneLiveMarkdownTextView(text: $text, targetLine: targetLine)
+        IPhoneLiveMarkdownTextView(text: $text, targetLine: targetLine, onSelectionChange: onSelectionChange)
         #endif
     }
 }
@@ -27,6 +28,7 @@ struct ObsidianLiveMarkdownEditor: View {
 private struct IPhoneLiveMarkdownTextView: UIViewRepresentable {
     @Binding var text: String
     let targetLine: Int?
+    let onSelectionChange: (NSRange) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -78,6 +80,7 @@ private struct IPhoneLiveMarkdownTextView: UIViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
+            parent.onSelectionChange(textView.selectedRange)
             render(textView)
         }
 
@@ -128,15 +131,7 @@ private struct IPhoneLiveMarkdownTextView: UIViewRepresentable {
                 if let activeRange,
                    NSIntersectionRange(activeRange, lineRange).length > 0 ||
                     (lineRange.length == 0 && activeRange.location == lineRange.location) {
-                    storage.addAttributes(
-                        [
-                            .font: UIFont.monospacedSystemFont(ofSize: 15, weight: .regular),
-                            .foregroundColor: UIColor.label,
-                            .backgroundColor: UIColor.systemBlue.withAlphaComponent(0.07),
-                            .paragraphStyle: paragraph
-                        ],
-                        range: lineRange
-                    )
+                    styleEditingLine(storage, source: source, range: lineRange)
                 } else {
                     styleRenderedLine(
                         storage,
@@ -149,7 +144,7 @@ private struct IPhoneLiveMarkdownTextView: UIViewRepresentable {
             }
             storage.endEditing()
             textView.typingAttributes = [
-                .font: UIFont.monospacedSystemFont(ofSize: 15, weight: .regular),
+                .font: UIFont.systemFont(ofSize: 16),
                 .foregroundColor: UIColor.label,
                 .paragraphStyle: paragraph
             ]
@@ -209,6 +204,27 @@ private struct IPhoneLiveMarkdownTextView: UIViewRepresentable {
                 return
             }
 
+            if trimmed.hasPrefix("|"), trimmed.hasSuffix("|") {
+                let isDivider = trimmed
+                    .replacingOccurrences(of: "|", with: "")
+                    .replacingOccurrences(of: ":", with: "")
+                    .replacingOccurrences(of: "-", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                    .isEmpty
+                if isDivider {
+                    hide(storage, range: range)
+                } else {
+                    storage.addAttributes(
+                        [
+                            .font: UIFont.monospacedSystemFont(ofSize: 14, weight: .regular),
+                            .backgroundColor: UIColor.secondarySystemFill
+                        ],
+                        range: range
+                    )
+                }
+                return
+            }
+
             if let heading = firstMatch(#"^(#{1,6})\s+(.*)$"#, in: line) {
                 let marker = globalRange(heading.range(at: 1), lineRange: range)
                 let title = globalRange(heading.range(at: 2), lineRange: range)
@@ -261,6 +277,59 @@ private struct IPhoneLiveMarkdownTextView: UIViewRepresentable {
             }
 
             applyInlineStyles(storage, line: line, lineRange: range)
+        }
+
+        private func styleEditingLine(_ storage: NSTextStorage, source: NSString, range: NSRange) {
+            guard range.length > 0 else { return }
+            let line = source.substring(with: range)
+            storage.addAttributes(
+                [.font: UIFont.systemFont(ofSize: 16), .foregroundColor: UIColor.label],
+                range: range
+            )
+            if let heading = firstMatch(#"^(#{1,6})\s+(.*)$"#, in: line) {
+                let marker = globalRange(heading.range(at: 1), lineRange: range)
+                let title = globalRange(heading.range(at: 2), lineRange: range)
+                let level = heading.range(at: 1).length
+                let size: CGFloat = switch level {
+                case 1: 27
+                case 2: 22
+                case 3: 19
+                default: 16
+                }
+                storage.addAttributes(
+                    [.font: UIFont.systemFont(ofSize: 13, weight: .medium), .foregroundColor: UIColor.secondaryLabel],
+                    range: marker
+                )
+                storage.addAttribute(
+                    .font,
+                    value: UIFont.systemFont(ofSize: size, weight: level <= 2 ? .bold : .semibold),
+                    range: title
+                )
+            }
+            applyVisibleInlineStyles(storage, line: line, lineRange: range)
+        }
+
+        private func applyVisibleInlineStyles(_ storage: NSTextStorage, line: String, lineRange: NSRange) {
+            for match in matches(#"\*\*(.+?)\*\*"#, in: line) {
+                storage.addAttribute(
+                    .font,
+                    value: UIFont.boldSystemFont(ofSize: 16),
+                    range: globalRange(match.range(at: 1), lineRange: lineRange)
+                )
+            }
+            for match in matches(#"(?<!\*)\*([^*\n]+)\*(?!\*)"#, in: line) {
+                storage.addAttribute(
+                    .font,
+                    value: UIFont.italicSystemFont(ofSize: 16),
+                    range: globalRange(match.range(at: 1), lineRange: lineRange)
+                )
+            }
+            for match in matches(#"`([^`\n]+)`"#, in: line) {
+                storage.addAttributes(
+                    [.font: UIFont.monospacedSystemFont(ofSize: 14, weight: .regular), .backgroundColor: UIColor.secondarySystemFill],
+                    range: globalRange(match.range(at: 1), lineRange: lineRange)
+                )
+            }
         }
 
         private func applyInlineStyles(_ storage: NSTextStorage, line: String, lineRange: NSRange) {
@@ -322,6 +391,7 @@ private struct IPhoneLiveMarkdownTextView: UIViewRepresentable {
 private struct MacLiveMarkdownTextView: NSViewRepresentable {
     @Binding var text: String
     let targetLine: Int?
+    let onSelectionChange: (NSRange) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -414,6 +484,7 @@ private struct MacLiveMarkdownTextView: NSViewRepresentable {
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
+            parent.onSelectionChange(textView.selectedRange())
             render(textView)
         }
 
@@ -459,7 +530,7 @@ private struct MacLiveMarkdownTextView: NSViewRepresentable {
 
                 if let activeRange, NSIntersectionRange(activeRange, lineRange).length > 0 ||
                     (lineRange.length == 0 && activeRange.location == lineRange.location) {
-                    styleEditingLine(storage, range: lineRange)
+                    styleEditingLine(storage, source: source, range: lineRange)
                 } else {
                     styleRenderedLine(
                         storage,
@@ -474,7 +545,7 @@ private struct MacLiveMarkdownTextView: NSViewRepresentable {
             storage.endEditing()
 
             textView.typingAttributes = [
-                .font: NSFont.monospacedSystemFont(ofSize: 14, weight: .regular),
+                .font: NSFont.systemFont(ofSize: 15),
                 .foregroundColor: NSColor.labelColor,
                 .paragraphStyle: bodyParagraph
             ]
@@ -515,20 +586,54 @@ private struct MacLiveMarkdownTextView: NSViewRepresentable {
             )
         }
 
-        private func styleEditingLine(_ storage: NSTextStorage, range: NSRange) {
+        private func styleEditingLine(_ storage: NSTextStorage, source: NSString, range: NSRange) {
             guard range.length > 0 else { return }
             let paragraph = NSMutableParagraphStyle()
             paragraph.lineSpacing = 4
             paragraph.paragraphSpacing = 7
             storage.addAttributes(
                 [
-                    .font: NSFont.monospacedSystemFont(ofSize: 14, weight: .regular),
+                    .font: NSFont.systemFont(ofSize: 15),
                     .foregroundColor: NSColor.labelColor,
-                    .backgroundColor: NSColor.controlAccentColor.withAlphaComponent(0.07),
                     .paragraphStyle: paragraph
                 ],
                 range: range
             )
+            let line = source.substring(with: range)
+            if let heading = firstMatch(#"^(#{1,6})\s+(.*)$"#, in: line) {
+                let marker = globalRange(heading.range(at: 1), lineRange: range)
+                let title = globalRange(heading.range(at: 2), lineRange: range)
+                let level = heading.range(at: 1).length
+                let size: CGFloat = switch level {
+                case 1: 27
+                case 2: 22
+                case 3: 18
+                default: 15
+                }
+                storage.addAttributes(
+                    [.font: NSFont.systemFont(ofSize: 12, weight: .medium), .foregroundColor: NSColor.secondaryLabelColor],
+                    range: marker
+                )
+                storage.addAttribute(
+                    .font,
+                    value: NSFont.systemFont(ofSize: size, weight: level <= 2 ? .bold : .semibold),
+                    range: title
+                )
+            }
+            for match in matches(#"\*\*(.+?)\*\*"#, in: line) {
+                storage.addAttribute(
+                    .font,
+                    value: NSFont.systemFont(ofSize: 15, weight: .bold),
+                    range: globalRange(match.range(at: 1), lineRange: range)
+                )
+            }
+            for match in matches(#"(?<!\*)\*([^*\n]+)\*(?!\*)"#, in: line) {
+                storage.addAttribute(
+                    .font,
+                    value: NSFontManager.shared.convert(NSFont.systemFont(ofSize: 15), toHaveTrait: .italicFontMask),
+                    range: globalRange(match.range(at: 1), lineRange: range)
+                )
+            }
         }
 
         private func styleRenderedLine(
@@ -555,6 +660,27 @@ private struct MacLiveMarkdownTextView: NSViewRepresentable {
                     ],
                     range: range
                 )
+                return
+            }
+
+            if trimmed.hasPrefix("|"), trimmed.hasSuffix("|") {
+                let isDivider = trimmed
+                    .replacingOccurrences(of: "|", with: "")
+                    .replacingOccurrences(of: ":", with: "")
+                    .replacingOccurrences(of: "-", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                    .isEmpty
+                if isDivider {
+                    hide(storage, range: range)
+                } else {
+                    storage.addAttributes(
+                        [
+                            .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular),
+                            .backgroundColor: NSColor.quaternaryLabelColor.withAlphaComponent(0.12)
+                        ],
+                        range: range
+                    )
+                }
                 return
             }
 

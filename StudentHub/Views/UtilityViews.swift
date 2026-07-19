@@ -12,7 +12,7 @@ struct CalendarWorkspaceView: View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .bottom) {
-                    HubPageHeader(eyebrow: "Plan", title: "Calendar", subtitle: "Drag across the day to reserve time, or drop a task onto an hour.")
+                    HubPageHeader(eyebrow: "Plan", title: "Calendar", subtitle: "Drag for speed, or type exact start and end times for precision.")
                     Spacer()
                     Button("Today") { selectedDate = Date() }.buttonStyle(.bordered)
                     DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
@@ -40,6 +40,11 @@ struct CalendarWorkspaceView: View {
                 Picker("Course", selection: $eventCourse) {
                     ForEach(appState.spaces) { course in Text(course.title).tag(course) }
                 }
+                CalendarTimeFields(
+                    date: selectedDate,
+                    selectionStart: $selectionStart,
+                    selectionEnd: $selectionEnd
+                )
                 VStack(alignment: .leading, spacing: 6) {
                     Text("SELECTED TIME").font(.system(size: 9, weight: .bold)).foregroundStyle(HubPalette.secondaryText)
                     Text("\(format(selectionStart)) – \(format(selectionEnd))")
@@ -103,9 +108,10 @@ struct CalendarSelectionGrid: View {
     @Binding var selectionStart: Double
     @Binding var selectionEnd: Double
     private let startHour = 8.0
-    private let endHour = 22.0
+    private let endHour = 24.0
     private let rowHeight = 52.0
     @State private var dragAnchor: Double?
+    @State private var editingBlock: ScheduleBlock?
 
     private var dayBlocks: [ScheduleBlock] {
         appState.scheduleBlocks.filter { Calendar.current.isDate($0.date, inSameDayAs: date) }
@@ -139,7 +145,11 @@ struct CalendarSelectionGrid: View {
                             .padding(.leading, 72)
                             .padding(.trailing, 12)
                             .offset(y: (block.startHour - startHour) * rowHeight + 3)
+                            .onTapGesture { editingBlock = block }
                             .contextMenu {
+                                Button("Edit exact time…", systemImage: "clock") {
+                                    editingBlock = block
+                                }
                                 if let taskID = block.linkedTaskID {
                                     Button("Open linked task") {
                                         appState.selectedTaskID = taskID
@@ -171,6 +181,9 @@ struct CalendarSelectionGrid: View {
             .frame(height: (endHour - startHour) * rowHeight)
         }
         .hubPanel(cornerRadius: 16)
+        .sheet(item: $editingBlock) { block in
+            CalendarBlockEditorView(block: block, defaultDate: date)
+        }
     }
 
     private var selectionOverlay: some View {
@@ -190,9 +203,155 @@ struct CalendarSelectionGrid: View {
     }
 
     private func formatHour(_ hour: Int) -> String {
-        let suffix = hour < 12 ? "AM" : "PM"
-        let display = hour == 12 ? 12 : hour % 12
+        let normalized = hour % 24
+        let suffix = normalized < 12 ? "AM" : "PM"
+        let display = normalized == 0 ? 12 : (normalized == 12 ? 12 : normalized % 12)
         return "\(display) \(suffix)"
+    }
+}
+
+struct CalendarTimeFields: View {
+    let date: Date
+    @Binding var selectionStart: Double
+    @Binding var selectionEnd: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                DatePicker("Start", selection: startDate, displayedComponents: .hourAndMinute)
+                DatePicker("End", selection: endDate, displayedComponents: .hourAndMinute)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Button("Start −5m") { adjustStart(by: -5) }.buttonStyle(.bordered)
+                    Button("Start +5m") { adjustStart(by: 5) }.buttonStyle(.bordered)
+                    Button("End −5m") { adjustEnd(by: -5) }.buttonStyle(.bordered)
+                    Button("End +5m") { adjustEnd(by: 5) }.buttonStyle(.bordered)
+                }
+            }
+            .controlSize(.small)
+            Text("Type a time or use the 5-minute controls; dragging remains available for rough selection.")
+                .font(.caption)
+                .foregroundStyle(HubPalette.secondaryText)
+        }
+    }
+
+    private var startDate: Binding<Date> {
+        Binding(
+            get: { dateForHour(selectionStart) },
+            set: { value in
+                selectionStart = min(24 - 1.0 / 60.0, max(0, decimalHour(value)))
+                if selectionEnd <= selectionStart {
+                    selectionEnd = min(24, selectionStart + 0.25)
+                }
+            }
+        )
+    }
+
+    private var endDate: Binding<Date> {
+        Binding(
+            get: { dateForHour(selectionEnd) },
+            set: { value in
+                selectionEnd = min(24, max(selectionStart + 1.0 / 60.0, decimalHour(value, treatingMidnightAs24: true)))
+            }
+        )
+    }
+
+    private func adjustStart(by minutes: Double) {
+        let duration = selectionEnd - selectionStart
+        selectionStart = min(24 - 1.0 / 60.0, max(0, selectionStart + minutes / 60))
+        selectionEnd = min(24, max(selectionStart + 1.0 / 60.0, selectionStart + duration))
+    }
+
+    private func adjustEnd(by minutes: Double) {
+        selectionEnd = min(24, max(selectionStart + 1.0 / 60.0, selectionEnd + minutes / 60))
+    }
+
+    private func dateForHour(_ hour: Double) -> Date {
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: date)
+        let totalMinutes = Int((hour * 60).rounded())
+        return calendar.date(byAdding: .minute, value: totalMinutes, to: day) ?? day
+    }
+
+    private func decimalHour(_ value: Date, treatingMidnightAs24: Bool = false) -> Double {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.hour, .minute], from: value)
+        let hour = components.hour ?? 0
+        let minute = components.minute ?? 0
+        if treatingMidnightAs24, hour == 0, minute == 0 { return 24 }
+        return Double(hour) + Double(minute) / 60
+    }
+}
+
+struct CalendarBlockEditorView: View {
+    @EnvironmentObject private var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+    private let blockID: UUID?
+    @State private var title: String
+    @State private var course: Course
+    @State private var date: Date
+    @State private var startHour: Double
+    @State private var endHour: Double
+
+    init(block: ScheduleBlock? = nil, defaultDate: Date) {
+        blockID = block?.id
+        _title = State(initialValue: block?.title ?? "Study block")
+        _course = State(initialValue: block?.course ?? .general)
+        _date = State(initialValue: block?.date ?? defaultDate)
+        _startHour = State(initialValue: block?.startHour ?? 16)
+        _endHour = State(initialValue: min(24, (block?.startHour ?? 16) + (block?.duration ?? 1)))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Block title", text: $title)
+                Picker("Space", selection: $course) {
+                    ForEach(appState.spaces) { Text($0.title).tag($0) }
+                }
+                DatePicker("Date", selection: $date, displayedComponents: .date)
+                CalendarTimeFields(date: date, selectionStart: $startHour, selectionEnd: $endHour)
+            }
+            .navigationTitle(blockID == nil ? "New time block" : "Edit time block")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save)
+                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .onAppear {
+                if !appState.spaces.contains(course) { course = appState.defaultSpace }
+            }
+        }
+        #if os(macOS)
+        .frame(minWidth: 500, minHeight: 390)
+        #endif
+    }
+
+    private func save() {
+        let cleanedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let blockID, var block = appState.scheduleBlocks.first(where: { $0.id == blockID }) {
+            block.title = cleanedTitle
+            block.course = course
+            block.date = date
+            block.startHour = startHour
+            block.duration = max(1.0 / 60.0, endHour - startHour)
+            appState.updateScheduleBlock(block)
+        } else {
+            appState.addScheduleBlock(
+                title: cleanedTitle,
+                course: course,
+                date: date,
+                startHour: startHour,
+                duration: max(1.0 / 60.0, endHour - startHour)
+            )
+        }
+        dismiss()
     }
 }
 
@@ -290,6 +449,7 @@ struct RemindersWorkspaceView: View {
 
 struct PomodoroWorkspaceView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var customMinutes = 45
 
     var body: some View {
         VStack(spacing: 24) {
@@ -324,6 +484,20 @@ struct PomodoroWorkspaceView: View {
                 Button("5 min break") { appState.resetPomodoro(minutes: 5) }.buttonStyle(.bordered)
                 Button("Count up") { appState.resetStopwatch() }.buttonStyle(.bordered)
             }
+            HStack(spacing: 8) {
+                TextField("Minutes", value: $customMinutes, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 78)
+                    .multilineTextAlignment(.trailing)
+                    .onSubmit(setCustomTimer)
+                Text("minutes")
+                    .font(.callout)
+                    .foregroundStyle(HubPalette.secondaryText)
+                Stepper("", value: $customMinutes, in: 1...1_440)
+                    .labelsHidden()
+                Button("Set custom", action: setCustomTimer)
+                    .buttonStyle(.bordered)
+            }
             Text("Try “start pomo”, “start 25 minute countdown”, or “start timer” in Command Hub.")
                 .font(.system(size: 11))
                 .foregroundStyle(HubPalette.secondaryText)
@@ -338,6 +512,11 @@ struct PomodoroWorkspaceView: View {
                 .frame(width: 430, height: 430)
         )
         .background(HubPalette.background)
+    }
+
+    private func setCustomTimer() {
+        customMinutes = min(1_440, max(1, customMinutes))
+        appState.resetPomodoro(minutes: customMinutes)
     }
 }
 

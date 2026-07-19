@@ -231,6 +231,8 @@ private struct CompactNoteEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: HubNote
     @State private var showsPreview = true
+    @State private var markdownSelection = NSRange(location: 0, length: 0)
+    @State private var exportURLs: [URL] = []
 
     init(note: HubNote) { _draft = State(initialValue: note) }
 
@@ -244,8 +246,11 @@ private struct CompactNoteEditor: View {
                         ForEach(appState.spaces) { Text($0.title).tag($0) }
                     }
                 }
-                TextEditor(text: $draft.markdown)
-                    .font(.system(size: 14, design: .monospaced))
+                ObsidianLiveMarkdownEditor(
+                    text: $draft.markdown,
+                    targetLine: nil,
+                    onSelectionChange: { markdownSelection = $0 }
+                )
                     .frame(minHeight: 240)
                     .padding(8)
                     .background(HubPalette.grouped)
@@ -280,13 +285,33 @@ private struct CompactNoteEditor: View {
                         }
                     }
                 }
+                ToolbarItem(placement: .automatic) {
+                    Button {
+                        appState.updateNote(draft)
+                        exportURLs = appState.exportNote(draft)
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if !exportURLs.isEmpty {
+                    ShareLink(items: exportURLs) {
+                        Label("Share PDF, RTF & CSV", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .padding(10)
+                    .frame(maxWidth: .infinity)
+                    .background(.bar)
+                }
             }
         }
     }
 
     private func insert(_ tool: MarkdownTool) {
-        let leadingNewline = !draft.markdown.isEmpty && !draft.markdown.hasSuffix("\n") ? "\n" : ""
-        draft.markdown += leadingNewline + tool.snippet
+        let result = tool.applying(to: draft.markdown, selection: markdownSelection)
+        draft.markdown = result.text
+        markdownSelection = result.selection
     }
 }
 
@@ -302,7 +327,7 @@ private struct CompactCalendarView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 15) {
-                HubPageHeader(eyebrow: "Plan", title: "Calendar", subtitle: "Drag across the timeline to select a colored time block.")
+                HubPageHeader(eyebrow: "Plan", title: "Calendar", subtitle: "Drag roughly, then type or nudge the exact time.")
                 DatePicker("Day", selection: $date, displayedComponents: .date)
                     .datePickerStyle(.compact)
                 CalendarSelectionGrid(date: date, selectionStart: $start, selectionEnd: $end)
@@ -312,6 +337,7 @@ private struct CompactCalendarView: View {
                     Picker("Course", selection: $course) {
                         ForEach(appState.spaces) { Text($0.title).tag($0) }
                     }
+                    CalendarTimeFields(date: date, selectionStart: $start, selectionEnd: $end)
                     Button("Add selected time") {
                         appState.addScheduleBlock(title: title, course: course, date: date, startHour: start, duration: max(0.25, end - start))
                     }
