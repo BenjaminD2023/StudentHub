@@ -107,7 +107,7 @@ struct CalendarSelectionGrid: View {
     let date: Date
     @Binding var selectionStart: Double
     @Binding var selectionEnd: Double
-    private let startHour = 8.0
+    private let startHour = 0.0
     private let endHour = 24.0
     private let rowHeight = 52.0
     @State private var dragAnchor: Double?
@@ -538,16 +538,26 @@ struct ExportWorkspaceView: View {
             .buttonStyle(HubProminentButtonStyle())
             .controlSize(.large)
 
-            if !appState.lastExportURLs.isEmpty {
+            if !appState.exportedFiles.isEmpty {
                 Divider()
-                HubSectionTitle(title: "Latest export")
-                ForEach(appState.lastExportURLs, id: \.self) { url in
+                HStack {
+                    HubSectionTitle(title: "Exported files", trailing: "\(appState.exportedFiles.count)")
+                    Spacer()
+                    Button("Delete all", role: .destructive) { appState.deleteAllExports() }
+                        .buttonStyle(.bordered)
+                }
+                ForEach(appState.exportedFiles, id: \.self) { url in
                     HStack {
                         Image(systemName: "doc")
                         Text(url.lastPathComponent).font(.system(size: 12, weight: .medium))
                         Spacer()
                         Button("Open") { OpenURLHelper.open(url) }.buttonStyle(.bordered)
                         Button("Reveal") { OpenURLHelper.reveal(url) }.buttonStyle(.bordered)
+                        Button(role: .destructive) { appState.deleteExport(url) } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .help("Delete \(url.lastPathComponent)")
                     }
                     .padding(12)
                     .hubPanel(cornerRadius: 12)

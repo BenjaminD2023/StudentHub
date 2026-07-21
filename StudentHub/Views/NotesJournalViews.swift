@@ -1,4 +1,9 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 struct NotesWorkspaceView: View {
     @EnvironmentObject private var appState: AppState
@@ -320,7 +325,6 @@ struct MarkdownNoteEditor: View {
     @Environment(\.openWindow) private var openWindow
     @State private var draft: HubNote
     @State private var isReadingMode = false
-    @State private var showsMarkdownTools = false
     @State private var targetHeadingLine: Int?
     @State private var markdownSelection = NSRange(location: 0, length: 0)
     @State private var autosaveTask: Task<Void, Never>?
@@ -357,18 +361,6 @@ struct MarkdownNoteEditor: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(isReadingMode ? HubPalette.hubAccent : HubPalette.secondaryText)
                     .help(isReadingMode ? "Return to live editing" : "Open reading view")
-
-                    Button {
-                        showsMarkdownTools.toggle()
-                    } label: {
-                        Image(systemName: "textformat")
-                            .frame(width: 28, height: 28)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Markdown tools and examples")
-                    .popover(isPresented: $showsMarkdownTools, arrowEdge: .bottom) {
-                        MarkdownToolsPanel { tool in insert(tool) }
-                    }
 
                     #if os(macOS)
                     if allowsPopOut {
@@ -414,6 +406,12 @@ struct MarkdownNoteEditor: View {
                             .foregroundStyle(HubPalette.secondaryText)
                     }
                 }
+
+                NoteFormattingBar(
+                    onTool: { insert($0) },
+                    onColor: { applyColor($0) }
+                )
+                .disabled(isReadingMode)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
@@ -423,12 +421,17 @@ struct MarkdownNoteEditor: View {
 
             Group {
                 if isReadingMode {
-                    MarkdownReadingView(source: draft.markdown, targetLine: targetHeadingLine)
+                    MarkdownReadingView(
+                        source: draft.markdown,
+                        targetLine: targetHeadingLine,
+                        onToggleChecklist: toggleChecklist
+                    )
                         .accessibilityLabel("Markdown reading view")
                 } else {
                     ObsidianLiveMarkdownEditor(
                         text: $draft.markdown,
                         targetLine: targetHeadingLine,
+                        selection: $markdownSelection,
                         onSelectionChange: { markdownSelection = $0 }
                     )
                         .accessibilityLabel("Markdown live preview editor")
@@ -515,7 +518,7 @@ struct MarkdownNoteEditor: View {
                 save(showStatus: false)
                 if let url = appState.noteURL(draft.id) { OpenURLHelper.reveal(url) }
             }
-            Button("Export PDF, RTF & CSV", systemImage: "square.and.arrow.up") {
+            Button("Export DOCX, PDF, RTF & CSV", systemImage: "square.and.arrow.up") {
                 save(showStatus: false)
                 exportURLs = appState.exportNote(draft)
             }
@@ -548,10 +551,23 @@ struct MarkdownNoteEditor: View {
     }
 
     private func insert(_ tool: MarkdownTool) {
-        let result = tool.applying(to: draft.markdown, selection: markdownSelection)
+        let result = tool.applyingShortcut(to: draft.markdown, selection: markdownSelection)
         draft.markdown = result.text
         markdownSelection = result.selection
         isReadingMode = false
+    }
+
+    private func applyColor(_ color: MarkdownTextColor) {
+        let result = MarkdownColorFormatting.applying(color, to: draft.markdown, selection: markdownSelection)
+        draft.markdown = result.text
+        markdownSelection = result.selection
+        isReadingMode = false
+    }
+
+    private func toggleChecklist(_ line: Int) {
+        guard let result = MarkdownChecklist.togglingLine(in: draft.markdown, lineNumber: line) else { return }
+        draft.markdown = result.text
+        markdownSelection = result.selection
     }
 
     private func scheduleAutosave() {
@@ -593,6 +609,9 @@ enum MarkdownTool: String, CaseIterable, Identifiable {
     case heading
     case bold
     case italic
+    case strikethrough
+    case underline
+    case highlight
     case checklist
     case link
     case quote
@@ -607,6 +626,9 @@ enum MarkdownTool: String, CaseIterable, Identifiable {
         case .heading: "Heading"
         case .bold: "Bold"
         case .italic: "Italic"
+        case .strikethrough: "Strikethrough"
+        case .underline: "Underline"
+        case .highlight: "Highlight"
         case .checklist: "Checklist"
         case .link: "Link"
         case .quote: "Quote"
@@ -621,6 +643,9 @@ enum MarkdownTool: String, CaseIterable, Identifiable {
         case .heading: "textformat.size"
         case .bold: "bold"
         case .italic: "italic"
+        case .strikethrough: "strikethrough"
+        case .underline: "underline"
+        case .highlight: "highlighter"
         case .checklist: "checklist"
         case .link: "link"
         case .quote: "text.quote"
@@ -635,6 +660,9 @@ enum MarkdownTool: String, CaseIterable, Identifiable {
         case .heading: "## Heading"
         case .bold: "**bold text**"
         case .italic: "*italic text*"
+        case .strikethrough: "~~strikethrough~~"
+        case .underline: "{{underline|underlined text}}"
+        case .highlight: "==highlighted text=="
         case .checklist: "- [ ] task"
         case .link: "[label](https://example.com)"
         case .quote: "> quote"
@@ -664,6 +692,12 @@ enum MarkdownTool: String, CaseIterable, Identifiable {
                 replacement = "**\(selectedText)**"
             case .italic:
                 replacement = "*\(selectedText)*"
+            case .strikethrough:
+                replacement = "~~\(selectedText)~~"
+            case .underline:
+                replacement = "{{underline|\(selectedText)}}"
+            case .highlight:
+                replacement = "==\(selectedText)=="
             case .checklist:
                 replacement = prefixLines(selectedText, with: "- [ ] ")
             case .link:
@@ -689,6 +723,133 @@ enum MarkdownTool: String, CaseIterable, Identifiable {
         )
     }
 
+    func applyingShortcut(to source: String, selection: NSRange) -> MarkdownEditResult {
+        switch self {
+        case .bold:
+            return applyingInlineShortcut(marker: "**", to: source, selection: selection)
+        case .italic:
+            return applyingInlineShortcut(marker: "*", to: source, selection: selection)
+        case .strikethrough:
+            return applyingInlineShortcut(marker: "~~", to: source, selection: selection)
+        case .underline:
+            return applyingAsymmetricShortcut(
+                opening: "{{underline|",
+                closing: "}}",
+                placeholder: "underlined text",
+                to: source,
+                selection: selection
+            )
+        case .highlight:
+            return applyingInlineShortcut(marker: "==", to: source, selection: selection)
+        case .code:
+            return applyingInlineShortcut(marker: "`", to: source, selection: selection)
+        case .link:
+            let sourceString = source as NSString
+            let location = selection.location == NSNotFound ? sourceString.length : min(selection.location, sourceString.length)
+            let length = min(selection.length, sourceString.length - location)
+            let range = NSRange(location: location, length: length)
+            let label = length == 0 ? "link" : sourceString.substring(with: range)
+            let destination = "https://example.com"
+            let replacement = "[\(label)](\(destination))"
+            let mutable = NSMutableString(string: source)
+            mutable.replaceCharacters(in: range, with: replacement)
+            return MarkdownEditResult(
+                text: mutable as String,
+                selection: NSRange(location: location + 1, length: (label as NSString).length)
+            )
+        default:
+            return applying(to: source, selection: selection)
+        }
+    }
+
+    private func applyingInlineShortcut(marker: String, to source: String, selection: NSRange) -> MarkdownEditResult {
+        let sourceString = source as NSString
+        let markerLength = (marker as NSString).length
+        let location = selection.location == NSNotFound ? sourceString.length : min(selection.location, sourceString.length)
+        let length = min(selection.length, sourceString.length - location)
+        let range = NSRange(location: location, length: length)
+        let selected = sourceString.substring(with: range)
+        let mutable = NSMutableString(string: source)
+
+        if length == 0 {
+            mutable.insert(marker + marker, at: location)
+            return MarkdownEditResult(
+                text: mutable as String,
+                selection: NSRange(location: location + markerLength, length: 0)
+            )
+        }
+
+        if selected.hasPrefix(marker), selected.hasSuffix(marker), length >= markerLength * 2 {
+            let innerRange = NSRange(location: markerLength, length: length - markerLength * 2)
+            let inner = (selected as NSString).substring(with: innerRange)
+            mutable.replaceCharacters(in: range, with: inner)
+            return MarkdownEditResult(
+                text: mutable as String,
+                selection: NSRange(location: location, length: (inner as NSString).length)
+            )
+        }
+
+        if location >= markerLength, NSMaxRange(range) + markerLength <= sourceString.length {
+            let before = sourceString.substring(with: NSRange(location: location - markerLength, length: markerLength))
+            let after = sourceString.substring(with: NSRange(location: NSMaxRange(range), length: markerLength))
+            if before == marker, after == marker {
+                mutable.replaceCharacters(
+                    in: NSRange(location: location - markerLength, length: length + markerLength * 2),
+                    with: selected
+                )
+                return MarkdownEditResult(
+                    text: mutable as String,
+                    selection: NSRange(location: location - markerLength, length: length)
+                )
+            }
+        }
+
+        mutable.replaceCharacters(in: range, with: marker + selected + marker)
+        return MarkdownEditResult(
+            text: mutable as String,
+            selection: NSRange(location: location + markerLength, length: length)
+        )
+    }
+
+    private func applyingAsymmetricShortcut(
+        opening: String,
+        closing: String,
+        placeholder: String,
+        to source: String,
+        selection: NSRange
+    ) -> MarkdownEditResult {
+        let sourceString = source as NSString
+        let openingLength = (opening as NSString).length
+        let closingLength = (closing as NSString).length
+        let location = selection.location == NSNotFound ? sourceString.length : min(selection.location, sourceString.length)
+        let length = min(selection.length, sourceString.length - location)
+        let range = NSRange(location: location, length: length)
+        let selected = length == 0 ? placeholder : sourceString.substring(with: range)
+        let mutable = NSMutableString(string: source)
+
+        if length > 0,
+           location >= openingLength,
+           NSMaxRange(range) + closingLength <= sourceString.length,
+           sourceString.substring(with: NSRange(location: location - openingLength, length: openingLength)) == opening,
+           sourceString.substring(with: NSRange(location: NSMaxRange(range), length: closingLength)) == closing {
+            mutable.replaceCharacters(
+                in: NSRange(location: location - openingLength, length: length + openingLength + closingLength),
+                with: selected
+            )
+            return MarkdownEditResult(
+                text: mutable as String,
+                selection: NSRange(location: location - openingLength, length: length)
+            )
+        }
+
+        let replacement = opening + selected + closing
+        mutable.replaceCharacters(in: range, with: replacement)
+        return MarkdownEditResult(
+            text: mutable as String,
+            selection: NSRange(location: location + openingLength, length: (selected as NSString).length)
+        )
+    }
+
     private func prefixLines(_ text: String, with prefix: String) -> String {
         text.components(separatedBy: .newlines)
             .map { prefix + $0 }
@@ -701,40 +862,367 @@ struct MarkdownEditResult: Equatable {
     let selection: NSRange
 }
 
-private struct MarkdownToolsPanel: View {
-    let onInsert: (MarkdownTool) -> Void
+enum MarkdownChecklist {
+    private static let pattern = #"^(\s*[-*+]\s+\[)([ xX])(\]\s+)(.*)$"#
+
+    static func togglingLine(in source: String, lineNumber: Int) -> MarkdownEditResult? {
+        let sourceString = source as NSString
+        var cursor = 0
+        var currentLine = 0
+        while cursor <= sourceString.length {
+            let range = sourceString.lineRange(for: NSRange(location: min(cursor, sourceString.length), length: 0))
+            if currentLine == lineNumber { return toggling(in: source, lineRange: range, requireHitAt: nil) }
+            guard NSMaxRange(range) > cursor, NSMaxRange(range) < sourceString.length else { break }
+            cursor = NSMaxRange(range)
+            currentLine += 1
+        }
+        return nil
+    }
+
+    static func togglingMarker(in source: String, characterIndex: Int) -> MarkdownEditResult? {
+        let sourceString = source as NSString
+        guard characterIndex >= 0, characterIndex <= sourceString.length else { return nil }
+        let lineRange = sourceString.lineRange(for: NSRange(location: min(characterIndex, sourceString.length), length: 0))
+        return toggling(in: source, lineRange: lineRange, requireHitAt: characterIndex)
+    }
+
+    private static func toggling(
+        in source: String,
+        lineRange: NSRange,
+        requireHitAt characterIndex: Int?
+    ) -> MarkdownEditResult? {
+        let sourceString = source as NSString
+        let contentRange = NSRange(
+            location: lineRange.location,
+            length: max(0, min(NSMaxRange(lineRange), sourceString.length) - lineRange.location)
+        )
+        let line = sourceString.substring(with: contentRange).trimmingCharacters(in: .newlines)
+        let lineString = line as NSString
+        guard let expression = try? NSRegularExpression(pattern: pattern),
+              let match = expression.firstMatch(
+                in: line,
+                range: NSRange(location: 0, length: lineString.length)
+              ) else { return nil }
+
+        if let characterIndex {
+            let marker = match.range(at: 1)
+            let globalMarker = NSRange(location: contentRange.location + marker.location, length: marker.length + 2)
+            guard NSLocationInRange(characterIndex, globalMarker) else { return nil }
+        }
+
+        let stateRange = match.range(at: 2)
+        let state = lineString.substring(with: stateRange)
+        let replacement = state == " " ? "x" : " "
+        let globalState = NSRange(location: contentRange.location + stateRange.location, length: stateRange.length)
+        let mutable = NSMutableString(string: source)
+        mutable.replaceCharacters(in: globalState, with: replacement)
+        return MarkdownEditResult(
+            text: mutable as String,
+            selection: NSRange(location: NSMaxRange(globalState), length: 0)
+        )
+    }
+}
+
+struct MarkdownTextColor: Identifiable, Hashable {
+    let name: String
+    let hex: UInt32?
+    var id: String { hex.map { String(format: "%06X", $0) } ?? "automatic" }
+    var color: Color { hex.map(Course.color(for:)) ?? .primary }
+
+    static let palette: [MarkdownTextColor] = [
+        MarkdownTextColor(name: "Automatic", hex: nil),
+        MarkdownTextColor(name: "Red", hex: 0xDC3545),
+        MarkdownTextColor(name: "Orange", hex: 0xE67E22),
+        MarkdownTextColor(name: "Gold", hex: 0xB7791F),
+        MarkdownTextColor(name: "Green", hex: 0x238636),
+        MarkdownTextColor(name: "Teal", hex: 0x138A8A),
+        MarkdownTextColor(name: "Blue", hex: 0x2563EB),
+        MarkdownTextColor(name: "Purple", hex: 0x7C3AED),
+        MarkdownTextColor(name: "Pink", hex: 0xC02670),
+        MarkdownTextColor(name: "Gray", hex: 0x667085)
+    ]
+
+    static func custom(_ color: Color) -> MarkdownTextColor? {
+        #if os(macOS)
+        guard let native = NSColor(color).usingColorSpace(.sRGB) else { return nil }
+        #else
+        let native = UIColor(color)
+        #endif
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        #if os(macOS)
+        native.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        #else
+        guard native.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return nil }
+        #endif
+        let value = UInt32((red * 255).rounded()) << 16
+            | UInt32((green * 255).rounded()) << 8
+            | UInt32((blue * 255).rounded())
+        return MarkdownTextColor(name: "Custom", hex: value)
+    }
+}
+
+enum MarkdownColorFormatting {
+    static let pattern = #"\{\{color:#([0-9A-Fa-f]{6})\|(.+?)\}\}"#
+
+    static func applying(_ color: MarkdownTextColor, to source: String, selection: NSRange) -> MarkdownEditResult {
+        let sourceString = source as NSString
+        let location = selection.location == NSNotFound ? sourceString.length : min(selection.location, sourceString.length)
+        let length = min(selection.length, sourceString.length - location)
+        let range = NSRange(location: location, length: length)
+        let expression = try! NSRegularExpression(pattern: pattern)
+
+        if length > 0,
+           let enclosing = expression.matches(in: source, range: NSRange(location: 0, length: sourceString.length)).first(where: {
+               let content = $0.range(at: 2)
+               return content.location <= range.location && NSMaxRange(range) <= NSMaxRange(content)
+           }) {
+            let contentRange = enclosing.range(at: 2)
+            let oldHex = sourceString.substring(with: enclosing.range(at: 1)).uppercased()
+            let before = sourceString.substring(with: NSRange(
+                location: contentRange.location,
+                length: range.location - contentRange.location
+            ))
+            let selected = sourceString.substring(with: range)
+            let after = sourceString.substring(with: NSRange(
+                location: NSMaxRange(range),
+                length: NSMaxRange(contentRange) - NSMaxRange(range)
+            ))
+            let beforePiece = wrap(before, hex: oldHex)
+            let selectedPiece = wrap(selected, hex: color.hexString)
+            let afterPiece = wrap(after, hex: oldHex)
+            let replacement = beforePiece + selectedPiece + afterPiece
+            let mutable = NSMutableString(string: source)
+            mutable.replaceCharacters(in: enclosing.range, with: replacement)
+            return MarkdownEditResult(
+                text: mutable as String,
+                selection: NSRange(
+                    location: enclosing.range.location + (beforePiece as NSString).length + openingLength(for: color.hexString),
+                    length: (selected as NSString).length
+                )
+            )
+        }
+
+        if length == 0 {
+            guard let hex = color.hexString else {
+                return MarkdownEditResult(text: source, selection: range)
+            }
+            let placeholder = "colored text"
+            let replacement = wrap(placeholder, hex: hex)
+            let mutable = NSMutableString(string: source)
+            mutable.insert(replacement, at: location)
+            return MarkdownEditResult(
+                text: mutable as String,
+                selection: NSRange(location: location + openingLength(for: hex), length: (placeholder as NSString).length)
+            )
+        }
+
+        let selected = sourceString.substring(with: range)
+        let plainSelection = removingMarkup(from: selected)
+        let replacement = wrap(plainSelection, hex: color.hexString)
+        let mutable = NSMutableString(string: source)
+        mutable.replaceCharacters(in: range, with: replacement)
+        return MarkdownEditResult(
+            text: mutable as String,
+            selection: NSRange(
+                location: location + openingLength(for: color.hexString),
+                length: (plainSelection as NSString).length
+            )
+        )
+    }
+
+    static func attributedString(from source: String) -> AttributedString {
+        customAttributedString(from: source)
+    }
+
+    private enum InlineStyle {
+        case color(UInt32)
+        case underline
+        case highlight
+        case strikethrough
+    }
+
+    private struct InlineMatch {
+        let range: NSRange
+        let content: String
+        let style: InlineStyle
+    }
+
+    private static func customAttributedString(from source: String) -> AttributedString {
+        let sourceString = source as NSString
+        let candidates: [InlineMatch] = [
+            firstInlineMatch(pattern, contentGroup: 2, in: source).map { match in
+                let hex = UInt32(sourceString.substring(with: match.range(at: 1)), radix: 16) ?? 0x20242B
+                return InlineMatch(
+                    range: match.range,
+                    content: sourceString.substring(with: match.range(at: 2)),
+                    style: .color(hex)
+                )
+            },
+            firstInlineMatch(#"\{\{underline\|(.+?)\}\}"#, contentGroup: 1, in: source).map { match in
+                InlineMatch(range: match.range, content: sourceString.substring(with: match.range(at: 1)), style: .underline)
+            },
+            firstInlineMatch(#"==(.+?)=="#, contentGroup: 1, in: source).map { match in
+                InlineMatch(range: match.range, content: sourceString.substring(with: match.range(at: 1)), style: .highlight)
+            },
+            firstInlineMatch(#"~~(.+?)~~"#, contentGroup: 1, in: source).map { match in
+                InlineMatch(range: match.range, content: sourceString.substring(with: match.range(at: 1)), style: .strikethrough)
+            }
+        ].compactMap { $0 }
+
+        guard let match = candidates.min(by: {
+            $0.range.location == $1.range.location
+                ? $0.range.length > $1.range.length
+                : $0.range.location < $1.range.location
+        }) else { return markdown(source) }
+
+        var result = AttributedString()
+        if match.range.location > 0 {
+            result += markdown(sourceString.substring(to: match.range.location))
+        }
+        var styled = customAttributedString(from: match.content)
+        switch match.style {
+        case .color(let hex): styled.foregroundColor = Course.color(for: hex)
+        case .underline: styled.underlineStyle = .single
+        case .highlight: styled.backgroundColor = Color.yellow.opacity(0.42)
+        case .strikethrough: styled.strikethroughStyle = .single
+        }
+        result += styled
+        if NSMaxRange(match.range) < sourceString.length {
+            result += customAttributedString(from: sourceString.substring(from: NSMaxRange(match.range)))
+        }
+        return result
+    }
+
+    private static func firstInlineMatch(
+        _ pattern: String,
+        contentGroup: Int,
+        in source: String
+    ) -> NSTextCheckingResult? {
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let match = expression.firstMatch(
+            in: source,
+            range: NSRange(location: 0, length: (source as NSString).length)
+        )
+        guard let match, match.range(at: contentGroup).location != NSNotFound else { return nil }
+        return match
+    }
+
+    private static func markdown(_ source: String) -> AttributedString {
+        (try? AttributedString(markdown: source)) ?? AttributedString(source)
+    }
+
+    private static func wrap(_ text: String, hex: String?) -> String {
+        guard !text.isEmpty else { return "" }
+        guard let hex else { return text }
+        return "{{color:#\(hex)|\(text)}}"
+    }
+
+    private static func openingLength(for hex: String?) -> Int {
+        guard let hex else { return 0 }
+        return ("{{color:#\(hex)|" as NSString).length
+    }
+
+    private static func removingMarkup(from source: String) -> String {
+        let expression = try! NSRegularExpression(pattern: pattern)
+        let mutable = NSMutableString(string: source)
+        for match in expression.matches(
+            in: source,
+            range: NSRange(location: 0, length: (source as NSString).length)
+        ).reversed() {
+            mutable.replaceCharacters(in: match.range, with: (source as NSString).substring(with: match.range(at: 2)))
+        }
+        return mutable as String
+    }
+}
+
+private extension MarkdownTextColor {
+    var hexString: String? { hex.map { String(format: "%06X", $0) } }
+}
+
+struct NoteFormattingBar: View {
+    let onTool: (MarkdownTool) -> Void
+    let onColor: (MarkdownTextColor) -> Void
+    @State private var customColor: Color = .blue
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Markdown tools").font(.headline)
-                Text("Select existing text to format it, or insert at the cursor.")
-                    .font(.caption)
-                    .foregroundStyle(HubPalette.secondaryText)
-            }
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(MarkdownTool.allCases) { tool in
-                    Button { onInsert(tool) } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Label(tool.title, systemImage: tool.icon)
-                                .font(.callout.weight(.semibold))
-                            Text(tool.syntax)
-                                .font(.caption.monospaced())
-                                .foregroundStyle(HubPalette.secondaryText)
-                                .lineLimit(2)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 58, alignment: .topLeading)
-                        .padding(9)
-                        .background(HubPalette.grouped)
-                        .clipShape(RoundedRectangle(cornerRadius: 9))
-                    }
-                    .buttonStyle(.plain)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 4) {
+                Menu {
+                    Button("Heading", systemImage: "textformat.size") { onTool(.heading) }
+                    Button("Quote", systemImage: "text.quote") { onTool(.quote) }
+                    Button("Code", systemImage: "chevron.left.forwardslash.chevron.right") { onTool(.code) }
+                    Button("Divider", systemImage: "minus") { onTool(.divider) }
+                } label: {
+                    Label("Style", systemImage: "textformat.size")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .frame(height: 30)
                 }
+                .menuStyle(.borderlessButton)
+
+                barDivider
+                toolButton(.bold, shortcut: "⌘B")
+                toolButton(.italic, shortcut: "⌘I")
+                toolButton(.underline)
+                toolButton(.strikethrough)
+                toolButton(.highlight)
+                barDivider
+
+                Menu {
+                    ForEach(MarkdownTextColor.palette) { color in
+                        Button { onColor(color) } label: {
+                            Label {
+                                Text(color.name)
+                            } icon: {
+                                Image(systemName: color.hex == nil ? "a.circle" : "circle.fill")
+                                    .symbolRenderingMode(.palette)
+                                    .foregroundStyle(color.color)
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "textformat")
+                        .foregroundStyle(HubPalette.hubAccent)
+                        .frame(width: 30, height: 30)
+                }
+                .menuStyle(.borderlessButton)
+                .help("Text color")
+
+                ColorPicker("Custom text color", selection: $customColor, supportsOpacity: false)
+                    .labelsHidden()
+                    .frame(width: 28, height: 28)
+                    .onChange(of: customColor) { _, value in
+                        if let color = MarkdownTextColor.custom(value) { onColor(color) }
+                    }
+
+                barDivider
+                toolButton(.checklist)
+                toolButton(.link, shortcut: "⌘K")
+                toolButton(.table)
             }
         }
-        .padding(16)
-        .frame(width: 390)
-        .background(HubPalette.background)
+        .padding(.horizontal, 6)
+        .frame(height: 40)
+        .background(HubPalette.grouped)
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .overlay { RoundedRectangle(cornerRadius: 9).stroke(HubPalette.separator, lineWidth: 1) }
+        .accessibilityLabel("Note formatting toolbar")
+    }
+
+    private func toolButton(_ tool: MarkdownTool, shortcut: String? = nil) -> some View {
+        Button { onTool(tool) } label: {
+            Image(systemName: tool.icon).frame(width: 30, height: 30)
+        }
+        .buttonStyle(.plain)
+        .help(shortcut.map { "\(tool.title) \($0)" } ?? tool.title)
+        .accessibilityLabel(tool.title)
+    }
+
+    private var barDivider: some View {
+        Rectangle().fill(HubPalette.separator).frame(width: 1, height: 20).padding(.horizontal, 3)
     }
 }
 
@@ -757,6 +1245,7 @@ private struct MarkdownHeading: Identifiable {
 struct MarkdownReadingView: View {
     let source: String
     let targetLine: Int?
+    var onToggleChecklist: ((Int) -> Void)? = nil
 
     private var lines: [(offset: Int, element: String)] {
         Array(source.components(separatedBy: .newlines).enumerated())
@@ -767,7 +1256,7 @@ struct MarkdownReadingView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 9) {
                     ForEach(lines, id: \.offset) { line in
-                        markdownLine(line.element).id(line.offset)
+                        markdownLine(line.element, lineNumber: line.offset).id(line.offset)
                     }
                 }
                 .textSelection(.enabled)
@@ -780,18 +1269,45 @@ struct MarkdownReadingView: View {
     }
 
     @ViewBuilder
-    private func markdownLine(_ source: String) -> some View {
+    private func markdownLine(_ source: String, lineNumber: Int) -> some View {
         let hashes = source.prefix(while: { $0 == "#" }).count
         if (1...6).contains(hashes), source.dropFirst(hashes).first == " " {
-            Text(source.dropFirst(hashes).trimmingCharacters(in: .whitespacesAndNewlines))
+            Text(MarkdownColorFormatting.attributedString(
+                from: source.dropFirst(hashes).trimmingCharacters(in: .whitespacesAndNewlines)
+            ))
                 .font(hashes == 1 ? .title2.bold() : (hashes == 2 ? .headline : .subheadline.bold()))
                 .padding(.top, hashes == 1 ? 8 : 4)
         } else if source.isEmpty {
             Color.clear.frame(height: 4)
+        } else if let checklist = checklistInfo(source) {
+            Button { onToggleChecklist?(lineNumber) } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 9) {
+                    Image(systemName: checklist.checked ? "checkmark.square.fill" : "square")
+                        .foregroundStyle(checklist.checked ? HubPalette.hubAccent : HubPalette.secondaryText)
+                    Text(MarkdownColorFormatting.attributedString(from: checklist.content))
+                        .strikethrough(checklist.checked)
+                        .foregroundStyle(checklist.checked ? HubPalette.secondaryText : Color.primary)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(onToggleChecklist == nil)
         } else {
-            Text((try? AttributedString(markdown: source)) ?? AttributedString(source))
+            Text(MarkdownColorFormatting.attributedString(from: source))
                 .font(.system(size: 14))
         }
+    }
+
+    private func checklistInfo(_ line: String) -> (checked: Bool, content: String)? {
+        let expression = try? NSRegularExpression(pattern: #"^\s*[-*+]\s+\[([ xX])\]\s+(.*)$"#)
+        let lineString = line as NSString
+        guard let match = expression?.firstMatch(
+            in: line,
+            range: NSRange(location: 0, length: lineString.length)
+        ) else { return nil }
+        let state = lineString.substring(with: match.range(at: 1))
+        return (state.lowercased() == "x", lineString.substring(with: match.range(at: 2)))
     }
 
     private func scroll(to line: Int?, with reader: ScrollViewProxy) {

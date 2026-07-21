@@ -14,11 +14,11 @@ Student Hub is a lightweight, local-first study workspace for macOS, iPhone, and
 - **Natural dates:** understands input such as `Math homework tomorrow 8pm`, `next Tue`, `Jul 22`, `7月20日`, and `下周三下午4点`.
 - **Focus commands:** use `start pomo`, `start 25 minute countdown`, or `start timer` for a Pomodoro, custom countdown, or count-up stopwatch.
 - **Connected workspace:** tasks can link to calendar blocks, projects, notes, subtasks, meetings, and colored Spaces. Calendar blocks support exact typed times and 5-minute adjustments through midnight.
-- **Obsidian-style Markdown:** notes render inside the editor; only the line being edited reveals its Markdown syntax. Select existing text to apply formatting, create Markdown tables, and export a note as PDF, Word/LibreOffice-compatible RTF, or Excel-compatible CSV.
+- **Obsidian-style Markdown:** notes render inside the editor; only the line being edited reveals its Markdown syntax. Select existing text to apply formatting and Word-style colors, create Markdown tables, use standard keyboard shortcuts, and export a styled Word/LibreOffice DOCX.
 - **Spaces:** create, rename, recolor, reorder, open, and directly delete Spaces together with their assigned content.
 - **Files and PDFs:** import files, open them quickly, preview PDFs, and keep annotation notes/free-text PDF annotations.
 - **Journal and meetings:** dated calendar entries, undated memos, transcripts, editable summaries, and action-item extraction.
-- **Portable output:** share tasks/projects as CSV or Markdown and individual notes as PDF, RTF, or table CSV on every platform.
+- **Portable output:** share tasks/projects as CSV or Markdown and individual notes as DOCX, PDF, RTF, or table CSV on every platform; manage and delete generated files from the Export screen.
 - **Native appearance:** responsive Mac/iPhone/iPad layouts with System, Light, and Dark modes.
 
 ![Quick Command](Design/first-usable-quick-command.png)

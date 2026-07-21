@@ -20,7 +20,7 @@ struct IPhoneCalendarView: View {
             .sorted { $0.startHour < $1.startHour }
     }
 
-    private var hours: [Int] { Array(6..<24) }
+    private var hours: [Int] { Array(0..<24) }
 
     var body: some View {
         NavigationStack {
@@ -144,7 +144,7 @@ struct IPhoneCalendarView: View {
 
     private func formatHour(_ hour: Int) -> String {
         let suffix = hour < 12 ? "AM" : "PM"
-        let display = hour == 12 ? 12 : hour % 12
+        let display = hour == 0 || hour == 12 ? 12 : hour % 12
         return "\(display) \(suffix)"
     }
 }

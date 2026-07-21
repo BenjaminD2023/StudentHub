@@ -47,9 +47,11 @@ struct CommandHubView: View {
             commandField
 
             ScrollView {
-                commandGuidance
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
+                if !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    commandGuidance
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                }
 
                 VStack(spacing: 0) {
                     HStack {
@@ -149,7 +151,7 @@ struct CommandHubView: View {
         HStack(spacing: 10) {
             Image(systemName: "chevron.right")
                 .foregroundStyle(.secondary)
-            TextField("Try “add essay next Friday 4 pm” or type /", text: $command)
+            TextField("Capture, search, or run a command", text: $command)
                 .font(.title3)
                 .textFieldStyle(.plain)
                 .onSubmit { applyCommand() }
@@ -170,10 +172,10 @@ struct CommandHubView: View {
     @ViewBuilder
     private var commandGuidance: some View {
         let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty || trimmed.hasPrefix("/") {
+        if trimmed.hasPrefix("/") {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Label(trimmed.hasPrefix("/") ? "Commands" : "Try a command", systemImage: "lightbulb")
+                    Label("Commands", systemImage: "command")
                         .font(.callout.weight(.semibold))
                     Spacer()
                     Text("Try Jul 22, 7/22, in 3 days, 下周三, or 7月20日")

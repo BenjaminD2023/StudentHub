@@ -310,9 +310,10 @@ final class StudentHubTests: XCTestCase {
             fromOffsets: IndexSet(integer: state.spaces.count - 1),
             toOffset: 0
         )
+        state.moveSpace(writing.id, by: 1)
         let note = state.addNote(title: "Essay plan", course: writing)
 
-        XCTAssertEqual(state.spaces.first, writing)
+        XCTAssertEqual(state.spaces.dropFirst().first, writing)
         XCTAssertEqual(state.notes.first(where: { $0.id == note.id })?.course, writing)
     }
 
@@ -327,6 +328,116 @@ final class StudentHubTests: XCTestCase {
 
         XCTAssertEqual(bold.text, "Review **these words** today")
         XCTAssertTrue(table.text.contains("| Column 1 | Column 2 |"))
+    }
+
+    func testMarkdownToolbarFormatsSelectedTextWithWordStyles() {
+        let source = "Make selected words clearer"
+        let selected = (source as NSString).range(of: "selected words")
+
+        let strike = MarkdownTool.strikethrough.applyingShortcut(to: source, selection: selected)
+        let underline = MarkdownTool.underline.applyingShortcut(to: source, selection: selected)
+        let highlight = MarkdownTool.highlight.applyingShortcut(to: source, selection: selected)
+
+        XCTAssertEqual(strike.text, "Make ~~selected words~~ clearer")
+        XCTAssertEqual(underline.text, "Make {{underline|selected words}} clearer")
+        XCTAssertEqual(highlight.text, "Make ==selected words== clearer")
+        XCTAssertEqual((underline.text as NSString).substring(with: underline.selection), "selected words")
+    }
+
+    func testMarkdownChecklistCanBeToggledFromItsRenderedMarker() throws {
+        let source = "Heading\n- [ ] Read chapter\nFooter"
+        let markerIndex = (source as NSString).range(of: "[ ]").location + 1
+
+        let checked = try XCTUnwrap(MarkdownChecklist.togglingMarker(in: source, characterIndex: markerIndex))
+        let unchecked = try XCTUnwrap(MarkdownChecklist.togglingLine(in: checked.text, lineNumber: 1))
+
+        XCTAssertEqual(checked.text, "Heading\n- [x] Read chapter\nFooter")
+        XCTAssertEqual(unchecked.text, source)
+    }
+
+    func testMarkdownKeyboardShortcutsToggleInlineFormatting() {
+        let source = "Review these words today"
+        let selected = (source as NSString).range(of: "these words")
+        let bold = MarkdownTool.bold.applyingShortcut(to: source, selection: selected)
+        let unbold = MarkdownTool.bold.applyingShortcut(to: bold.text, selection: bold.selection)
+        let insertion = MarkdownTool.italic.applyingShortcut(
+            to: "Start ",
+            selection: NSRange(location: 6, length: 0)
+        )
+
+        XCTAssertEqual(bold.text, "Review **these words** today")
+        XCTAssertEqual((bold.text as NSString).substring(with: bold.selection), "these words")
+        XCTAssertEqual(unbold.text, source)
+        XCTAssertEqual(insertion.text, "Start **")
+        XCTAssertEqual(insertion.selection, NSRange(location: 7, length: 0))
+    }
+
+    func testMarkdownTextColorAppliesRecolorsAndReturnsToAutomatic() {
+        let source = "Review these words today"
+        let selected = (source as NSString).range(of: "these words")
+        let red = MarkdownTextColor(name: "Red", hex: 0xDC3545)
+        let blue = MarkdownTextColor(name: "Blue", hex: 0x2563EB)
+        let automatic = MarkdownTextColor(name: "Automatic", hex: nil)
+
+        let colored = MarkdownColorFormatting.applying(red, to: source, selection: selected)
+        let innerSelection = (colored.text as NSString).range(of: "these")
+        let recolored = MarkdownColorFormatting.applying(blue, to: colored.text, selection: innerSelection)
+        let cleared = MarkdownColorFormatting.applying(automatic, to: colored.text, selection: colored.selection)
+
+        XCTAssertEqual((colored.text as NSString).substring(with: colored.selection), "these words")
+        XCTAssertTrue(colored.text.contains("{{color:#DC3545|these words}}"))
+        XCTAssertTrue(recolored.text.contains("{{color:#2563EB|these}}"))
+        XCTAssertEqual(cleared.text, source)
+    }
+
+    func testNoteProducesARealOfficeOpenXMLDocument() throws {
+        let note = HubNote(
+            title: "Styled notes",
+            markdown: "# Heading\n\nA {{color:#DC3545|**bold** idea}} with *emphasis*, {{underline|underlining}}, ==highlighting==, and ~~striking~~.",
+            course: .calculus
+        )
+
+        let data = try WorkspaceStorage.officeOpenXMLData(for: note)
+
+        XCTAssertEqual(Array(data.prefix(2)), [0x50, 0x4B])
+        XCTAssertGreaterThan(data.count, 1_000)
+        XCTAssertNotNil(data.range(of: Data("word/document.xml".utf8)))
+        XCTAssertNotNil(data.range(of: Data("428CFA".utf8)))
+        XCTAssertNotNil(data.range(of: Data("DC3545".utf8)))
+        XCTAssertNotNil(data.range(of: Data("<w:u w:val=\"single\"/>".utf8)))
+        XCTAssertNotNil(data.range(of: Data("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"FFF2A8\"/>".utf8)))
+        XCTAssertNotNil(data.range(of: Data("<w:strike/>".utf8)))
+        #if os(macOS)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("docx")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try data.write(to: url)
+        let unzip = Process()
+        unzip.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        unzip.arguments = ["-tqq", url.path]
+        unzip.standardOutput = FileHandle.nullDevice
+        unzip.standardError = FileHandle.nullDevice
+        try unzip.run()
+        unzip.waitUntilExit()
+        XCTAssertEqual(unzip.terminationStatus, 0)
+        #endif
+    }
+
+    func testExportStorageListsAndDeletesOnlyExportFiles() throws {
+        try WorkspaceStorage.prepareDirectories()
+        let url = WorkspaceStorage.exportsURL
+            .appendingPathComponent("delete-test-\(UUID().uuidString)")
+            .appendingPathExtension("txt")
+        try Data("temporary".utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        XCTAssertTrue(WorkspaceStorage.exportedFiles().contains(url))
+        try WorkspaceStorage.deleteExport(at: url)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+
+        let outside = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data().write(to: outside)
+        defer { try? FileManager.default.removeItem(at: outside) }
+        XCTAssertThrowsError(try WorkspaceStorage.deleteExport(at: outside))
     }
 
     func testMarkdownTableExportsAsExcelCompatibleCSV() {

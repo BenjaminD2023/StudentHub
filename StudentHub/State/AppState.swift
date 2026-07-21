@@ -36,6 +36,7 @@ final class AppState: ObservableObject {
     @Published var focusTimerElapsed = 0
     @Published var pomodoroLinkedTaskID: UUID?
     @Published var lastExportURLs: [URL] = []
+    @Published var exportedFiles: [URL] = []
     @Published var statusMessage: String?
     @Published var cloudSyncStatus: CloudSyncStatus = .localOnly
     @Published var isCloudSyncEnabled: Bool {
@@ -117,6 +118,7 @@ final class AppState: ObservableObject {
         if let selectedNoteID { openNoteIDs = [selectedNoteID] }
         if let timer = storedSnapshot?.focusTimer { restoreFocusTimer(from: timer) }
         try? WorkspaceStorage.prepareDirectories()
+        refreshExports()
         if seedData, storedSnapshot == nil { persist() }
         if isCloudSyncEnabled {
             if CloudSyncAvailability.isConfigured {
@@ -208,6 +210,14 @@ final class AppState: ObservableObject {
 
     func moveSpaces(fromOffsets offsets: IndexSet, toOffset destination: Int) {
         spaces.move(fromOffsets: offsets, toOffset: destination)
+        persist()
+    }
+
+    func moveSpace(_ id: String, by offset: Int) {
+        guard let index = spaces.firstIndex(where: { $0.id == id }) else { return }
+        let destination = index + offset
+        guard spaces.indices.contains(destination) else { return }
+        spaces.swapAt(index, destination)
         persist()
     }
 
@@ -730,6 +740,7 @@ final class AppState: ObservableObject {
     func exportWorkspace() {
         do {
             lastExportURLs = try WorkspaceStorage.export(tasks: tasks, projects: projects)
+            refreshExports()
             statusMessage = "Exported CSV and Markdown"
         } catch {
             statusMessage = "Export failed: \(error.localizedDescription)"
@@ -741,11 +752,38 @@ final class AppState: ObservableObject {
         do {
             let urls = try WorkspaceStorage.export(note: note)
             lastExportURLs = urls
-            statusMessage = "Exported PDF, RTF, and CSV"
+            refreshExports()
+            statusMessage = "Exported DOCX, PDF, RTF, and CSV"
             return urls
         } catch {
             statusMessage = "Note export failed: \(error.localizedDescription)"
             return []
+        }
+    }
+
+    func refreshExports() {
+        exportedFiles = WorkspaceStorage.exportedFiles()
+    }
+
+    func deleteExport(_ url: URL) {
+        do {
+            try WorkspaceStorage.deleteExport(at: url)
+            lastExportURLs.removeAll(where: { $0.standardizedFileURL == url.standardizedFileURL })
+            refreshExports()
+            statusMessage = "Deleted \(url.lastPathComponent)"
+        } catch {
+            statusMessage = "Could not delete export: \(error.localizedDescription)"
+        }
+    }
+
+    func deleteAllExports() {
+        do {
+            try WorkspaceStorage.deleteAllExports()
+            lastExportURLs = []
+            refreshExports()
+            statusMessage = "Deleted all exports"
+        } catch {
+            statusMessage = "Could not clear exports: \(error.localizedDescription)"
         }
     }
 

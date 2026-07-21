@@ -387,7 +387,7 @@ struct DayTimelineView: View {
                     hourGrid
                     scheduleBlocksLayer
                 }
-                .frame(height: rowHeight * 16)
+                .frame(height: rowHeight * 24)
             }
             .background(HubPalette.grouped)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -427,7 +427,7 @@ struct DayTimelineView: View {
 
     private var hourGrid: some View {
         VStack(spacing: 0) {
-            ForEach(8..<24, id: \.self) { hour in
+            ForEach(0..<24, id: \.self) { hour in
                 HStack(spacing: 12) {
                     Text(formatHour(hour))
                         .font(.system(size: 10, design: .monospaced))
@@ -457,7 +457,7 @@ struct DayTimelineView: View {
                     .frame(height: max(48, positioned.block.duration * rowHeight - 8))
                     .offset(
                         x: leftInset + CGFloat(positioned.column) * (blockWidth + columnGap),
-                        y: (positioned.block.startHour - 8) * rowHeight + 7
+                        y: positioned.block.startHour * rowHeight + 7
                     )
             }
         }
@@ -570,7 +570,7 @@ struct DayTimelineView: View {
 
     private func formatHour(_ hour: Int) -> String {
         let suffix = hour < 12 ? "AM" : "PM"
-        let display = hour == 12 ? 12 : hour % 12
+        let display = hour == 0 || hour == 12 ? 12 : hour % 12
         return "\(display) \(suffix)"
     }
 }

@@ -249,22 +249,20 @@ private struct CompactNoteEditor: View {
                 ObsidianLiveMarkdownEditor(
                     text: $draft.markdown,
                     targetLine: nil,
+                    selection: $markdownSelection,
                     onSelectionChange: { markdownSelection = $0 }
                 )
                     .frame(minHeight: 240)
                     .padding(8)
                     .background(HubPalette.grouped)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(MarkdownTool.allCases) { tool in
-                            Button { insert(tool) } label: { Label(tool.title, systemImage: tool.icon) }
-                                .buttonStyle(.bordered)
-                        }
-                    }
-                }
+                NoteFormattingBar(onTool: insert, onColor: applyColor)
                 DisclosureGroup("Live Markdown preview", isExpanded: $showsPreview) {
-                    MarkdownReadingView(source: draft.markdown, targetLine: nil)
+                    MarkdownReadingView(
+                        source: draft.markdown,
+                        targetLine: nil,
+                        onToggleChecklist: toggleChecklist
+                    )
                         .frame(minHeight: 220)
                         .background(HubPalette.grouped)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -297,7 +295,7 @@ private struct CompactNoteEditor: View {
             .safeAreaInset(edge: .bottom) {
                 if !exportURLs.isEmpty {
                     ShareLink(items: exportURLs) {
-                        Label("Share PDF, RTF & CSV", systemImage: "square.and.arrow.up")
+                        Label("Share DOCX, PDF, RTF & CSV", systemImage: "square.and.arrow.up")
                     }
                     .buttonStyle(.borderedProminent)
                     .padding(10)
@@ -309,7 +307,19 @@ private struct CompactNoteEditor: View {
     }
 
     private func insert(_ tool: MarkdownTool) {
-        let result = tool.applying(to: draft.markdown, selection: markdownSelection)
+        let result = tool.applyingShortcut(to: draft.markdown, selection: markdownSelection)
+        draft.markdown = result.text
+        markdownSelection = result.selection
+    }
+
+    private func applyColor(_ color: MarkdownTextColor) {
+        let result = MarkdownColorFormatting.applying(color, to: draft.markdown, selection: markdownSelection)
+        draft.markdown = result.text
+        markdownSelection = result.selection
+    }
+
+    private func toggleChecklist(_ line: Int) {
+        guard let result = MarkdownChecklist.togglingLine(in: draft.markdown, lineNumber: line) else { return }
         draft.markdown = result.text
         markdownSelection = result.selection
     }
@@ -647,9 +657,14 @@ private struct CompactExportView: View {
                 .buttonStyle(HubProminentButtonStyle())
                 .controlSize(.large)
 
-                if !appState.lastExportURLs.isEmpty {
-                    HubSectionTitle(title: "Latest export")
-                    ForEach(appState.lastExportURLs, id: \.self) { url in
+                if !appState.exportedFiles.isEmpty {
+                    HStack {
+                        HubSectionTitle(title: "Exported files", trailing: "\(appState.exportedFiles.count)")
+                        Spacer()
+                        Button("Delete all", role: .destructive) { appState.deleteAllExports() }
+                            .font(.caption.weight(.semibold))
+                    }
+                    ForEach(appState.exportedFiles, id: \.self) { url in
                         HStack(spacing: 12) {
                             Image(systemName: "doc")
                             Text(url.lastPathComponent)
@@ -660,6 +675,10 @@ private struct CompactExportView: View {
                                 Image(systemName: "square.and.arrow.up")
                             }
                             .accessibilityLabel("Share \(url.lastPathComponent)")
+                            Button(role: .destructive) { appState.deleteExport(url) } label: {
+                                Image(systemName: "trash")
+                            }
+                            .accessibilityLabel("Delete \(url.lastPathComponent)")
                         }
                         .padding(14)
                         .hubPanel(cornerRadius: 12)
