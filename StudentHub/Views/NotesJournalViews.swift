@@ -929,6 +929,32 @@ struct MarkdownTextColor: Identifiable, Hashable {
     var id: String { hex.map { String(format: "%06X", $0) } ?? "automatic" }
     var color: Color { hex.map(Course.color(for:)) ?? .primary }
 
+    var menuIcon: Image {
+        #if os(macOS)
+        let image = NSImage(size: NSSize(width: 16, height: 16), flipped: false) { rect in
+            if let hex {
+                Self.nativeColor(for: hex).setFill()
+                NSBezierPath(ovalIn: rect.insetBy(dx: 2, dy: 2)).fill()
+            } else if let symbol = NSImage(
+                systemSymbolName: "a.circle",
+                accessibilityDescription: name
+            )?.withSymbolConfiguration(.init(paletteColors: [.labelColor])) {
+                symbol.draw(in: rect)
+            }
+            return true
+        }
+        image.isTemplate = false
+        return Image(nsImage: image)
+        #else
+        let symbolName = hex == nil ? "a.circle" : "circle.fill"
+        let nativeColor = hex.map(Self.nativeColor(for:)) ?? .label
+        let configuration = UIImage.SymbolConfiguration(paletteColors: [nativeColor])
+        let image = UIImage(systemName: symbolName, withConfiguration: configuration)?
+            .withRenderingMode(.alwaysOriginal) ?? UIImage()
+        return Image(uiImage: image)
+        #endif
+    }
+
     static let palette: [MarkdownTextColor] = [
         MarkdownTextColor(name: "Automatic", hex: nil),
         MarkdownTextColor(name: "Red", hex: 0xDC3545),
@@ -962,6 +988,26 @@ struct MarkdownTextColor: Identifiable, Hashable {
             | UInt32((blue * 255).rounded())
         return MarkdownTextColor(name: "Custom", hex: value)
     }
+
+    #if os(macOS)
+    private static func nativeColor(for hex: UInt32) -> NSColor {
+        NSColor(
+            srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+    #else
+    private static func nativeColor(for hex: UInt32) -> UIColor {
+        UIColor(
+            red: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+    #endif
 }
 
 enum MarkdownColorFormatting {
@@ -1177,9 +1223,7 @@ struct NoteFormattingBar: View {
                             Label {
                                 Text(color.name)
                             } icon: {
-                                Image(systemName: color.hex == nil ? "a.circle" : "circle.fill")
-                                    .symbolRenderingMode(.palette)
-                                    .foregroundStyle(color.color)
+                                color.menuIcon
                             }
                         }
                     }
