@@ -305,13 +305,8 @@ enum CommandParser {
     static func parse(_ input: String, now: Date = Date(), calendar: Calendar = .current, spaces: [Course] = Course.allCases) -> QuickCommandDraft {
         let lowered = input.lowercased()
         let fallback = spaces.first(where: { $0.id == Course.general.id }) ?? spaces.first ?? .general
-        let aliases = [("debate", Course.debate.id), ("calc", Course.calculus.id), ("chem", Course.chemistry.id)]
-        let aliasMatch = aliases.first(where: { lowered.contains($0.0) })
-            .flatMap { alias in spaces.first(where: { $0.id == alias.1 }) }
-        let namedMatch = spaces
-            .sorted { $0.title.count > $1.title.count }
-            .first(where: { lowered.contains($0.title.lowercased()) || lowered.contains("#\($0.id.lowercased())") })
-        let course = aliasMatch ?? namedMatch ?? fallback
+        let resolvedCourse = resolveCourse(in: input, spaces: spaces)
+        let course = resolvedCourse?.course ?? fallback
 
         var recognizedTokens: [CommandToken] = []
         var dueDay = now
@@ -373,6 +368,15 @@ enum CommandParser {
         )
         title = title.replacingOccurrences(of: #"(?i)^\s*(?:add|create|task|move|reschedule)\s+"#, with: "", options: .regularExpression)
         title = title.replacingOccurrences(of: #"\s+#\w+"#, with: "", options: .regularExpression)
+        let keepSubjectInTitle = firstMatch(
+            #"(?i)^\s*(?:/(?:project|note)|create\s+(?:project|note)|new\s+(?:project|note))\b"#,
+            in: input
+        ) != nil
+        if let resolvedCourse, !keepSubjectInTitle {
+            for term in resolvedCourse.matchedTexts.sorted(by: { $0.count > $1.count }) {
+                title = stripCourseTerm(term, from: title)
+            }
+        }
         title = title.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
         title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let trailingConnector = #"(?i)(?:\s+|^)(?:due|by|on|at|for|to|in)\s*$"#
@@ -391,6 +395,149 @@ enum CommandParser {
             linkedNote: course.id == Course.chemistry.id ? "Lab Notes.md" : nil,
             recognizedTokens: recognizedTokens
         )
+    }
+
+    private static let subjectAliases: [String: [String]] = [
+        "chemistry": ["chem", "chemistry", "化学", "chems"],
+        "calculus": ["calc", "calculus", "cal", "math", "数学"],
+        "debate": ["debate", "deb", "辩论"],
+        "history": ["hist", "history", "历史"],
+        "biology": ["bio", "biology", "生物"],
+        "physics": ["phys", "physics", "phy", "物理"],
+        "english": ["eng", "english", "ela", "英语"],
+        "literature": ["lit", "literature", "文学"],
+        "spanish": ["span", "spanish", "西班牙语"],
+        "french": ["fren", "french", "法语"],
+        "computer science": ["cs", "comp sci", "compsci", "coding", "programming"],
+        "statistics": ["stats", "stat", "statistics", "统计"],
+        "geometry": ["geo", "geometry", "几何"],
+        "algebra": ["alg", "algebra", "代数"],
+        "economics": ["econ", "economics", "经济"],
+        "government": ["gov", "govt", "government", "政治"],
+        "psychology": ["psych", "psychology", "心理"]
+    ]
+
+    private static let subjectNoiseWords: Set<String> = [
+        "honors", "honour", "honours", "ap", "ib", "pre", "preap", "advanced",
+        "intro", "introduction", "general", "basic", "elementary", "intermediate",
+        "college", "prep", "preparatory", "academic", "standard", "regular",
+        "level", "class", "course", "period"
+    ]
+
+    private static func resolveCourse(in input: String, spaces: [Course]) -> (course: Course, matchedTexts: [String])? {
+        var candidates: [(course: Course, matchedTexts: [String], score: Int)] = []
+        for space in spaces where space.id != Course.general.id {
+            let matched = courseMatchTexts(in: input, for: space)
+            guard !matched.isEmpty else { continue }
+            candidates.append((space, matched, courseMatchScore(space, matchedTexts: matched)))
+        }
+        return candidates
+            .sorted {
+                if $0.score != $1.score { return $0.score > $1.score }
+                return $0.course.title.count > $1.course.title.count
+            }
+            .first
+            .map { ($0.course, $0.matchedTexts) }
+    }
+
+    private static func courseMatchTexts(in input: String, for space: Course) -> [String] {
+        var matched: [String] = []
+        let lowered = input.lowercased()
+        let title = space.title
+        let loweredTitle = title.lowercased()
+
+        if let hash = firstMatch(#"(?i)#\#(NSRegularExpression.escapedPattern(for: space.id))\b"#, in: input) {
+            matched.append(hash.full)
+        }
+        if let hashTitle = firstMatch(#"(?i)#\#(NSRegularExpression.escapedPattern(for: loweredTitle.replacingOccurrences(of: " ", with: "")))\b"#, in: input) {
+            matched.append(hashTitle.full)
+        }
+        if let titleMatch = wordMatch(of: title, in: input) {
+            matched.append(titleMatch)
+        }
+
+        let significant = significantSubjectTokens(in: title)
+        for token in significant where token.count >= 3 {
+            if let hit = wordMatch(of: token, in: input) {
+                matched.append(hit)
+            }
+        }
+
+        for (canonical, aliases) in subjectAliases {
+            guard subjectFamilyMatches(canonical, spaceTitle: loweredTitle, significant: significant) else { continue }
+            for alias in aliases {
+                if let hit = wordMatch(of: alias, in: input) {
+                    matched.append(hit)
+                }
+            }
+        }
+
+        if lowered.contains(space.id.lowercased()), space.id.count >= 3,
+           let hit = wordMatch(of: space.id, in: input) {
+            matched.append(hit)
+        }
+
+        return uniquePreservingOrder(matched)
+    }
+
+    private static func courseMatchScore(_ space: Course, matchedTexts: [String]) -> Int {
+        let longest = matchedTexts.map(\.count).max() ?? 0
+        let exactTitle = matchedTexts.contains { $0.compare(space.title, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }
+        return (exactTitle ? 100 : 0) + longest * 2 + space.title.count
+    }
+
+    private static func subjectFamilyMatches(_ canonical: String, spaceTitle: String, significant: [String]) -> Bool {
+        if spaceTitle.contains(canonical) { return true }
+        if significant.contains(where: { $0 == canonical || canonical.contains($0) || $0.contains(canonical) }) { return true }
+        let compactTitle = spaceTitle.replacingOccurrences(of: " ", with: "")
+        return compactTitle.contains(canonical.replacingOccurrences(of: " ", with: ""))
+    }
+
+    private static func significantSubjectTokens(in title: String) -> [String] {
+        title
+            .lowercased()
+            .split { !$0.isLetter && !$0.isNumber }
+            .map(String.init)
+            .filter { !$0.isEmpty && !subjectNoiseWords.contains($0) && $0.count >= 3 }
+    }
+
+    private static func wordMatch(of term: String, in input: String) -> String? {
+        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let escaped = NSRegularExpression.escapedPattern(for: trimmed)
+        if trimmed.contains(where: { $0.isWhitespace }) {
+            return firstMatch("(?i)" + escaped, in: input)?.full
+        }
+        if trimmed.unicodeScalars.allSatisfy({ CharacterSet.letters.contains($0) || CharacterSet.decimalDigits.contains($0) }) {
+            return firstMatch(#"(?i)(?<![A-Za-z0-9])\#(escaped)(?![A-Za-z0-9])"#, in: input)?.full
+        }
+        return firstMatch("(?i)" + escaped, in: input)?.full
+    }
+
+    private static func stripCourseTerm(_ term: String, from title: String) -> String {
+        let trimmed = term.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "#")))
+        guard !trimmed.isEmpty else { return title }
+        let escaped = NSRegularExpression.escapedPattern(for: trimmed)
+        let replacement = trimmed.unicodeScalars.contains(where: { $0.isASCII }) ? " " : ""
+        if trimmed.contains(where: { $0.isWhitespace }) {
+            return title.replacingOccurrences(of: "(?i)" + escaped, with: replacement, options: .regularExpression)
+        }
+        if trimmed.unicodeScalars.allSatisfy({ CharacterSet.letters.contains($0) || CharacterSet.decimalDigits.contains($0) }) {
+            return title.replacingOccurrences(
+                of: #"(?i)(?<![A-Za-z0-9])\#(escaped)(?![A-Za-z0-9])"#,
+                with: replacement,
+                options: .regularExpression
+            )
+        }
+        return title.replacingOccurrences(of: "(?i)" + escaped, with: replacement, options: .regularExpression)
+    }
+
+    private static func uniquePreservingOrder(_ items: [String]) -> [String] {
+        var seen = Set<String>()
+        return items.filter {
+            let key = $0.lowercased()
+            return seen.insert(key).inserted
+        }
     }
 
     private static func dateMatch(in input: String, now: Date, calendar: Calendar) -> (date: Date, label: String)? {

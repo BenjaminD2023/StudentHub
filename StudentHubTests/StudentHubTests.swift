@@ -55,7 +55,8 @@ final class StudentHubTests: XCTestCase {
         let draft = CommandParser.parse("交化学作业 明天下午4点", now: now, calendar: calendar)
         let components = calendar.dateComponents([.day, .hour, .minute], from: draft.dueDate)
 
-        XCTAssertEqual(draft.title, "交化学作业")
+        XCTAssertEqual(draft.title, "交作业")
+        XCTAssertEqual(draft.course, .chemistry)
         XCTAssertEqual(components.day, 18)
         XCTAssertEqual(components.hour, 16)
         XCTAssertEqual(components.minute, 0)
@@ -176,6 +177,28 @@ final class StudentHubTests: XCTestCase {
         XCTAssertEqual(draft.title, "Finish close reading")
         XCTAssertEqual(draft.course, literature)
         XCTAssertTrue(draft.recognizedTokens.contains { $0.kind == .course })
+    }
+
+    func testQuickCommandMatchesSubjectAbbreviationsToCurrentCourse() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Shanghai"))
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 7, day: 17, hour: 9)))
+        let honorsChemistry = Course(id: "honors-chemistry", title: "Honors Chemistry", colorHex: 0xF5B824)
+        let apCalculus = Course(id: "ap-calculus", title: "AP Calculus", colorHex: 0x428CFA)
+        let spaces = [honorsChemistry, apCalculus, .general]
+
+        let abbreviated = CommandParser.parse("chem lab report tomorrow 7:30 pm", now: now, calendar: calendar, spaces: spaces)
+        XCTAssertEqual(abbreviated.title, "Lab report")
+        XCTAssertEqual(abbreviated.course, honorsChemistry)
+        XCTAssertTrue(abbreviated.recognizedTokens.contains { $0.kind == .course && $0.text == "Honors Chemistry" })
+
+        let fullName = CommandParser.parse("Finish chemistry worksheet Friday", now: now, calendar: calendar, spaces: spaces)
+        XCTAssertEqual(fullName.title, "Finish worksheet")
+        XCTAssertEqual(fullName.course, honorsChemistry)
+
+        let calc = CommandParser.parse("calc limits packet", now: now, calendar: calendar, spaces: spaces)
+        XCTAssertEqual(calc.title, "Limits packet")
+        XCTAssertEqual(calc.course, apCalculus)
     }
 
     func testLegacyCourseValueStillDecodes() throws {
