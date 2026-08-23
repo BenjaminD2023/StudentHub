@@ -372,11 +372,26 @@ private struct CaptureRow: View {
     @EnvironmentObject private var appState: AppState
     let capture: WhiteboardCapture
 
+    @State private var draft = ""
+    @FocusState private var isFocused: Bool
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(capture.text)
+            TextField("Capture", text: $draft, axis: .vertical)
                 .font(.system(size: 12, weight: .medium))
-                .lineLimit(3)
+                .textFieldStyle(.plain)
+                .lineLimit(1...6)
+                .focused($isFocused)
+                .onSubmit(commit)
+                .onChange(of: isFocused) { _, focused in
+                    if !focused { commit() }
+                }
+                .onChange(of: capture.text) { _, newValue in
+                    if !isFocused { draft = newValue }
+                }
+                .onAppear { draft = capture.text }
+                .accessibilityLabel("Scratchpad note")
+                .accessibilityHint("Edit this capture")
             HStack(spacing: 8) {
                 Text(capture.createdAt.formatted(date: .omitted, time: .shortened))
                     .font(.caption2)
@@ -414,6 +429,16 @@ private struct CaptureRow: View {
         .padding(10)
         .background(HubPalette.selected.opacity(0.65))
         .clipShape(RoundedRectangle(cornerRadius: 9))
+    }
+
+    private func commit() {
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            draft = capture.text
+            return
+        }
+        appState.updateCapture(capture.id, text: trimmed)
+        draft = trimmed
     }
 }
 

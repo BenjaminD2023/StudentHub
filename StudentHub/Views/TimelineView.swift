@@ -503,17 +503,8 @@ struct DayTimelineView: View {
             if !appState.captures.isEmpty {
                 railCard(title: "Scratchpad", count: appState.captures.count) {
                     ForEach(appState.captures.prefix(3)) { capture in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(capture.text)
-                                .font(.system(size: 12, weight: .medium))
-                                .lineLimit(2)
-                                .foregroundStyle(HubPalette.primaryText)
-                            Text(capture.createdAt.formatted(.relative(presentation: .named)))
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 4)
+                        ScratchpadEditRow(capture: capture)
+                        if capture.id != appState.captures.prefix(3).last?.id { Divider() }
                     }
                 }
             }
@@ -572,6 +563,50 @@ struct DayTimelineView: View {
         let suffix = hour < 12 ? "AM" : "PM"
         let display = hour == 0 || hour == 12 ? 12 : hour % 12
         return "\(display) \(suffix)"
+    }
+}
+
+private struct ScratchpadEditRow: View {
+    @EnvironmentObject private var appState: AppState
+    let capture: WhiteboardCapture
+
+    @State private var draft = ""
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            TextField("Capture", text: $draft, axis: .vertical)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(HubPalette.primaryText)
+                .textFieldStyle(.plain)
+                .lineLimit(1...4)
+                .focused($isFocused)
+                .onSubmit(commit)
+                .onChange(of: isFocused) { _, focused in
+                    if !focused { commit() }
+                }
+                .onChange(of: capture.text) { _, newValue in
+                    if !isFocused { draft = newValue }
+                }
+                .accessibilityLabel("Scratchpad note")
+                .accessibilityHint("Edit this capture")
+            Text(capture.createdAt.formatted(.relative(presentation: .named)))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
+        .onAppear { draft = capture.text }
+    }
+
+    private func commit() {
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            draft = capture.text
+            return
+        }
+        appState.updateCapture(capture.id, text: trimmed)
+        draft = trimmed
     }
 }
 

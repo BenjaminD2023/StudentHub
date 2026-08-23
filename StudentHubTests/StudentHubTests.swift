@@ -495,4 +495,36 @@ final class StudentHubTests: XCTestCase {
         XCTAssertEqual(state.scheduleBlocks.first?.startHour ?? 0, 23 + 5.0 / 60.0, accuracy: 0.0001)
         XCTAssertEqual(state.scheduleBlocks.first?.duration ?? 0, 40.0 / 60.0, accuracy: 0.0001)
     }
+
+    @MainActor
+    func testCreatingATaskFromQuickCommandDoesNotAlsoSaveACapture() {
+        let state = AppState(seedData: false, persistenceEnabled: false)
+        let draft = QuickCommandDraft(
+            title: "Lab report",
+            course: .chemistry,
+            dueDate: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        state.createTask(from: draft)
+
+        XCTAssertEqual(state.tasks.map(\.title), ["Lab report"])
+        XCTAssertTrue(state.captures.isEmpty)
+    }
+
+    @MainActor
+    func testUpdatingACaptureRewritesItsTextAndIgnoresBlankEdits() {
+        let state = AppState(seedData: false, persistenceEnabled: false)
+        let capture = state.addCapture("Ask about citations")
+        let originalText = capture.text
+
+        state.updateCapture(capture.id, text: "  Ask Ms. Li about citations  ")
+        XCTAssertEqual(state.captures.first?.text, "Ask Ms. Li about citations")
+
+        state.updateCapture(capture.id, text: "   ")
+        XCTAssertEqual(state.captures.first?.text, "Ask Ms. Li about citations")
+
+        state.updateCapture(UUID(), text: "Should not appear")
+        XCTAssertEqual(state.captures.map(\.text), ["Ask Ms. Li about citations"])
+        XCTAssertEqual(originalText, "Ask about citations")
+    }
 }

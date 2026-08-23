@@ -333,6 +333,14 @@ final class AppState: ObservableObject {
         persist()
     }
 
+    func updateCapture(_ id: UUID, text: String) {
+        guard let index = captures.firstIndex(where: { $0.id == id }) else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, captures[index].text != trimmed else { return }
+        captures[index].text = trimmed
+        persist()
+    }
+
     func deleteCapture(_ id: UUID) {
         captures.removeAll(where: { $0.id == id })
         persist()
@@ -374,8 +382,6 @@ final class AppState: ObservableObject {
             task.linkedNote = noteName
             updateTask(task)
         }
-        captures.insert(WhiteboardCapture(text: draft.title, linkedTaskID: task.id), at: 0)
-        persist()
     }
 
     func updateTask(_ task: HubTask) {
