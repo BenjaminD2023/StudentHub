@@ -215,17 +215,59 @@ struct CommandInterpretation: Equatable {
     }
 }
 
+private struct EscapedCommandInput {
+    let protected: String
+    private let escaped: [String]
+
+    init(_ input: String) {
+        var protected = ""
+        var escaped: [String] = []
+        var index = input.startIndex
+
+        while index < input.endIndex {
+            guard input[index] == "\\" else {
+                protected.append(input[index])
+                index = input.index(after: index)
+                continue
+            }
+
+            let next = input.index(after: index)
+            guard next < input.endIndex, !input[next].isWhitespace else {
+                protected.append(input[index])
+                index = next
+                continue
+            }
+
+            let end = input[next...].firstIndex(where: \.isWhitespace) ?? input.endIndex
+            escaped.append(String(input[next..<end]))
+            protected += "\u{E000}\(escaped.count - 1)\u{E001}"
+            index = end
+        }
+
+        self.protected = protected
+        self.escaped = escaped
+    }
+
+    func restore(_ input: String) -> String {
+        escaped.enumerated().reduce(input) { result, entry in
+            result.replacingOccurrences(of: "\u{E000}\(entry.offset)\u{E001}", with: entry.element)
+        }
+    }
+}
+
 enum CommandInterpreter {
     static func interpret(_ input: String, now: Date = Date(), calendar: Calendar = .current, spaces: [Course] = Course.allCases) -> CommandInterpretation {
-        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let escaped = EscapedCommandInput(source)
+        let trimmed = escaped.protected.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowered = trimmed.lowercased()
-        let draft = CommandParser.parse(trimmed, now: now, calendar: calendar, spaces: spaces)
+        let draft = CommandParser.parse(source, now: now, calendar: calendar, spaces: spaces)
 
         if let timerCommand = timerCommand(in: lowered) {
             return CommandInterpretation(intent: .startTimer(timerCommand), draft: draft)
         }
         if let capture = payload(in: trimmed, prefixes: ["/capture", "capture:", "save to scratchpad"]) {
-            return CommandInterpretation(intent: .capture(text: capture), draft: draft)
+            return CommandInterpretation(intent: .capture(text: escaped.restore(capture)), draft: draft)
         }
         if payload(in: trimmed, prefixes: ["/project", "create project", "new project"]) != nil {
             return CommandInterpretation(intent: .createProject, draft: draft)
@@ -234,12 +276,12 @@ enum CommandInterpreter {
             return CommandInterpretation(intent: .createNote, draft: draft)
         }
         if let target = rescheduleTarget(in: trimmed) {
-            return CommandInterpretation(intent: .rescheduleTask(query: target), draft: draft)
+            return CommandInterpretation(intent: .rescheduleTask(query: escaped.restore(target)), draft: draft)
         }
         if lowered.hasPrefix("find ") || lowered.hasPrefix("search ") {
             let query = String(trimmed.dropFirst(lowered.hasPrefix("find ") ? 5 : 7))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            return CommandInterpretation(intent: .search(query: query), draft: draft)
+            return CommandInterpretation(intent: .search(query: escaped.restore(query)), draft: draft)
         }
         return CommandInterpretation(intent: .createTask, draft: draft)
     }
@@ -302,7 +344,9 @@ enum CommandInterpreter {
 }
 
 enum CommandParser {
-    static func parse(_ input: String, now: Date = Date(), calendar: Calendar = .current, spaces: [Course] = Course.allCases) -> QuickCommandDraft {
+    static func parse(_ source: String, now: Date = Date(), calendar: Calendar = .current, spaces: [Course] = Course.allCases) -> QuickCommandDraft {
+        let escaped = EscapedCommandInput(source)
+        let input = escaped.protected
         let lowered = input.lowercased()
         let fallback = spaces.first(where: { $0.id == Course.general.id }) ?? spaces.first ?? .general
         let resolvedCourse = resolveCourse(in: input, spaces: spaces)
@@ -384,6 +428,7 @@ enum CommandParser {
             title = title.replacingOccurrences(of: trailingConnector, with: "", options: .regularExpression)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        title = escaped.restore(title)
         if let first = title.first {
             title.replaceSubrange(title.startIndex...title.startIndex, with: String(first).uppercased())
         }

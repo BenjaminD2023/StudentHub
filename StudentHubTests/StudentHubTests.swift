@@ -105,6 +105,31 @@ final class StudentHubTests: XCTestCase {
         )
     }
 
+    func testQuickCommandEscapesWordsFromParsing() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Shanghai"))
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 7, day: 17, hour: 9)))
+
+        let draft = CommandParser.parse("Review \\tomorrow \\chem \\7/20 \\4pm \\#literature", now: now, calendar: calendar)
+        let due = calendar.dateComponents([.day, .hour, .minute], from: draft.dueDate)
+
+        XCTAssertEqual(draft.title, "Review tomorrow chem 7/20 4pm #literature")
+        XCTAssertEqual(draft.course, .general)
+        XCTAssertEqual(due.day, 17)
+        XCTAssertEqual(due.hour, 19)
+        XCTAssertEqual(due.minute, 30)
+        XCTAssertTrue(draft.recognizedTokens.isEmpty)
+    }
+
+    func testCommandInterpreterEscapesCommandVerbsAndCaptureText() {
+        let task = CommandInterpreter.interpret("\\start timer")
+        let capture = CommandInterpreter.interpret("/capture \\tomorrow")
+
+        XCTAssertEqual(task.intent, .createTask)
+        XCTAssertEqual(task.draft.title, "Start timer")
+        XCTAssertEqual(capture.intent, .capture(text: "tomorrow"))
+    }
+
     @MainActor
     func testProjectCreationTrimsInputAndSelectsCreatedProject() throws {
         let state = AppState(seedData: false, persistenceEnabled: false)
