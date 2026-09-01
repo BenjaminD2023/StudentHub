@@ -121,6 +121,19 @@ final class StudentHubTests: XCTestCase {
         XCTAssertTrue(draft.recognizedTokens.isEmpty)
     }
 
+    func testQuickCommandEscapesCompleteSubjectNames() {
+        let honorsChemistry = Course(id: "honors-chemistry", title: "Honors Chemistry", colorHex: 0xF5B824)
+        let computerScience = Course(id: "computer-science", title: "Computer Science", colorHex: 0x428CFA)
+        let spaces = [honorsChemistry, computerScience, .chemistry, .calculus, .debate, .personal, .general]
+
+        for subject in ["Chemistry", "Debate", "Personal", "Honors Chemistry", "Computer Science", "AP Calculus"] {
+            let draft = CommandParser.parse("\\\(subject) notes", spaces: spaces)
+
+            XCTAssertEqual(draft.course, .general, subject)
+            XCTAssertEqual(draft.title, "\(subject) notes")
+        }
+    }
+
     func testCommandInterpreterEscapesCommandVerbsAndCaptureText() {
         let task = CommandInterpreter.interpret("\\start timer")
         let capture = CommandInterpreter.interpret("/capture \\tomorrow")

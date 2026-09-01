@@ -219,7 +219,7 @@ private struct EscapedCommandInput {
     let protected: String
     private let escaped: [String]
 
-    init(_ input: String) {
+    init(_ input: String, phrases: [String] = []) {
         var protected = ""
         var escaped: [String] = []
         var index = input.startIndex
@@ -238,7 +238,21 @@ private struct EscapedCommandInput {
                 continue
             }
 
-            let end = input[next...].firstIndex(where: \.isWhitespace) ?? input.endIndex
+            let end = phrases
+                .sorted { $0.count > $1.count }
+                .compactMap { phrase -> String.Index? in
+                    guard !phrase.isEmpty,
+                          let range = input.range(
+                              of: phrase,
+                              options: [.caseInsensitive, .anchored],
+                              range: next..<input.endIndex
+                          ),
+                          range.upperBound == input.endIndex || !(input[range.upperBound].isLetter || input[range.upperBound].isNumber) else {
+                        return nil
+                    }
+                    return range.upperBound
+                }
+                .first ?? input[next...].firstIndex(where: \.isWhitespace) ?? input.endIndex
             escaped.append(String(input[next..<end]))
             protected += "\u{E000}\(escaped.count - 1)\u{E001}"
             index = end
@@ -258,7 +272,7 @@ private struct EscapedCommandInput {
 enum CommandInterpreter {
     static func interpret(_ input: String, now: Date = Date(), calendar: Calendar = .current, spaces: [Course] = Course.allCases) -> CommandInterpretation {
         let source = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        let escaped = EscapedCommandInput(source)
+        let escaped = EscapedCommandInput(source, phrases: spaces.map(\.title))
         let trimmed = escaped.protected.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowered = trimmed.lowercased()
         let draft = CommandParser.parse(source, now: now, calendar: calendar, spaces: spaces)
@@ -345,7 +359,7 @@ enum CommandInterpreter {
 
 enum CommandParser {
     static func parse(_ source: String, now: Date = Date(), calendar: Calendar = .current, spaces: [Course] = Course.allCases) -> QuickCommandDraft {
-        let escaped = EscapedCommandInput(source)
+        let escaped = EscapedCommandInput(source, phrases: spaces.map(\.title))
         let input = escaped.protected
         let lowered = input.lowercased()
         let fallback = spaces.first(where: { $0.id == Course.general.id }) ?? spaces.first ?? .general
