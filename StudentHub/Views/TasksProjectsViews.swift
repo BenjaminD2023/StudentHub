@@ -11,6 +11,8 @@ struct TasksWorkspaceView: View {
     @State private var newTitle = ""
     @State private var newCourse: Course = .general
     @State private var newDueDate = Date()
+    @State private var newEstimatedMinutes: Int? = 30
+    @State private var newRecurrence: RecurrenceRule?
     @State private var showsCompleted = false
 
     private var visibleTasks: [HubTask] {
@@ -69,6 +71,9 @@ struct TasksWorkspaceView: View {
             }
         }
         .background(HubPalette.background)
+        .onAppear {
+            if !appState.spaces.contains(newCourse) { newCourse = appState.defaultSpace }
+        }
     }
 
     private var newTaskComposer: some View {
@@ -84,20 +89,26 @@ struct TasksWorkspaceView: View {
                     .disabled(newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             Divider()
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Picker("Course", selection: $newCourse) {
                     ForEach(appState.spaces) { course in Text(course.title).tag(course) }
                 }
                 .labelsHidden()
-                .frame(maxWidth: 180)
-                Divider().frame(height: 18)
-                DatePicker("Due", selection: $newDueDate)
+                .frame(maxWidth: .infinity)
+                Picker("Predicted time", selection: $newEstimatedMinutes) {
+                    Text("No estimate").tag(Optional<Int>.none)
+                    ForEach([15, 30, 45, 60, 90, 120], id: \.self) { minutes in
+                        Text(minutes.studyDurationLabel).tag(Optional(minutes))
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 104)
+                HubRecurrencePicker(selection: $newRecurrence)
                     .labelsHidden()
-                Spacer()
-                Text("Press Return to capture quickly")
-                    .font(.system(size: 10))
-                    .foregroundStyle(HubPalette.tertiaryText)
+                    .frame(width: 124)
             }
+            DatePicker("Due", selection: $newDueDate)
+                .font(.system(size: 11, weight: .medium))
         }
         .padding(14)
         .hubPanel(cornerRadius: 16)
@@ -106,9 +117,16 @@ struct TasksWorkspaceView: View {
     private func addTask() {
         let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        let task = appState.addTask(title: trimmed, course: newCourse, dueDate: newDueDate)
+        let task = appState.addTask(
+            title: trimmed,
+            course: newCourse,
+            dueDate: newDueDate,
+            estimatedMinutes: newEstimatedMinutes,
+            recurrence: newRecurrence
+        )
         appState.selectedTaskID = task.id
         newTitle = ""
+        newRecurrence = nil
     }
 }
 
@@ -153,6 +171,9 @@ struct TaskWorkspaceRow: View {
                         if task.parentTaskID != nil {
                             Text("• subtask")
                         }
+                        if let estimate = task.estimatedDurationLabel {
+                            Text("• \(estimate)")
+                        }
                     }
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(HubPalette.secondaryText)
@@ -161,6 +182,11 @@ struct TaskWorkspaceRow: View {
                 if task.linkedNoteID != nil {
                     Image(systemName: "note.text")
                         .foregroundStyle(HubPalette.secondaryText)
+                }
+                if let recurrence = task.recurrence {
+                    Image(systemName: "repeat")
+                        .foregroundStyle(HubPalette.secondaryText)
+                        .help(recurrence.title)
                 }
                 Text(task.dueDate.formatted(date: .abbreviated, time: .shortened))
                     .font(.system(size: 11, weight: .medium))
@@ -226,6 +252,19 @@ struct TaskInspectorView: View {
                     DatePicker("", selection: $draft.dueDate)
                         .labelsHidden()
                 }
+                field("Repeat") {
+                    HubRecurrencePicker(selection: $draft.recurrence)
+                        .labelsHidden()
+                }
+                field("Predicted time") {
+                    Picker("Predicted time", selection: $draft.estimatedMinutes) {
+                        Text("Not estimated").tag(Optional<Int>.none)
+                        ForEach([15, 30, 45, 60, 90, 120], id: \.self) { minutes in
+                            Text(minutes.studyDurationLabel).tag(Optional(minutes))
+                        }
+                    }
+                    .labelsHidden()
+                }
                 field("Project") {
                     Picker("Project", selection: $draft.projectID) {
                         Text("No project").tag(Optional<UUID>.none)
@@ -286,6 +325,12 @@ struct TaskInspectorView: View {
                             .font(.system(size: 12))
                             .strikethrough(task.isCompleted)
                         Spacer()
+                    }
+                    .contentShape(Rectangle())
+                    .contextMenu {
+                        Button("Delete subtask", role: .destructive) {
+                            appState.deleteTask(task.id)
+                        }
                     }
                 }
 
@@ -504,6 +549,12 @@ struct ProjectInspectorView: View {
                         Spacer()
                     }
                     .font(.system(size: 12))
+                    .contentShape(Rectangle())
+                    .contextMenu {
+                        Button("Delete task", role: .destructive) {
+                            appState.deleteTask(task.id)
+                        }
+                    }
                 }
 
                 Divider()

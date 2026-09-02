@@ -157,6 +157,8 @@ struct MeetingRecord: Identifiable, Hashable, Codable {
     var transcript: String
     var summary: String
     var actionTaskIDs: [UUID]
+    var recurrence: RecurrenceRule?
+    var nextOccurrenceID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -165,7 +167,9 @@ struct MeetingRecord: Identifiable, Hashable, Codable {
         projectID: UUID? = nil,
         transcript: String = "",
         summary: String = "",
-        actionTaskIDs: [UUID] = []
+        actionTaskIDs: [UUID] = [],
+        recurrence: RecurrenceRule? = nil,
+        nextOccurrenceID: UUID? = nil
     ) {
         self.id = id
         self.title = title
@@ -174,6 +178,8 @@ struct MeetingRecord: Identifiable, Hashable, Codable {
         self.transcript = transcript
         self.summary = summary
         self.actionTaskIDs = actionTaskIDs
+        self.recurrence = recurrence
+        self.nextOccurrenceID = nextOccurrenceID
     }
 }
 

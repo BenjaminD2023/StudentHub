@@ -59,6 +59,33 @@ struct IPhoneTaskInspectorView: View {
                             ), displayedComponents: [.date, .hourAndMinute])
                         }
 
+                        Section("Repeat") {
+                            HubRecurrencePicker(selection: Binding(
+                                get: { draft.recurrence },
+                                set: { newValue in
+                                    var d = draft
+                                    d.recurrence = newValue
+                                    self.draft = d
+                                }
+                            ))
+                        }
+
+                        Section("Predicted time") {
+                            Picker("Estimate", selection: Binding(
+                                get: { draft.estimatedMinutes },
+                                set: { newValue in
+                                    var d = draft
+                                    d.estimatedMinutes = newValue
+                                    self.draft = d
+                                }
+                            )) {
+                                Text("Not estimated").tag(Optional<Int>.none)
+                                ForEach([15, 30, 45, 60, 90, 120], id: \.self) { minutes in
+                                    Text(minutes.studyDurationLabel).tag(Optional(minutes))
+                                }
+                            }
+                        }
+
                         Section("Details") {
                             TextField("Notes", text: Binding(
                                 get: { draft.details },
@@ -83,6 +110,13 @@ struct IPhoneTaskInspectorView: View {
                                     }
                                     .contentShape(Rectangle())
                                     .onTapGesture { appState.toggleComplete(sub.id) }
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                        Button(role: .destructive) {
+                                            appState.deleteTask(sub.id)
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                    }
                                 }
                             }
                         }

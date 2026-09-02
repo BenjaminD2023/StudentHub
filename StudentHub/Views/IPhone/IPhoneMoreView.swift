@@ -146,7 +146,13 @@ struct IPhoneSpacesView: View {
                                 }
                             }
                         }
-                        Button { editingSpace = space } label: {
+                        Menu {
+                            Button("Edit Space", systemImage: "pencil") { editingSpace = space }
+                            Button("Move up", systemImage: "arrow.up") { appState.moveSpace(space.id, by: -1) }
+                                .disabled(appState.spaces.first?.id == space.id)
+                            Button("Move down", systemImage: "arrow.down") { appState.moveSpace(space.id, by: 1) }
+                                .disabled(appState.spaces.last?.id == space.id)
+                        } label: {
                             Image(systemName: "ellipsis.circle")
                         }
                         .buttonStyle(.plain)

@@ -36,6 +36,7 @@ final class AppState: ObservableObject {
     @Published var focusTimerElapsed = 0
     @Published var pomodoroLinkedTaskID: UUID?
     @Published var lastExportURLs: [URL] = []
+    @Published var exportedFiles: [URL] = []
     @Published var statusMessage: String?
     @Published var cloudSyncStatus: CloudSyncStatus = .localOnly
     @Published var isCloudSyncEnabled: Bool {
@@ -117,6 +118,8 @@ final class AppState: ObservableObject {
         if let selectedNoteID { openNoteIDs = [selectedNoteID] }
         if let timer = storedSnapshot?.focusTimer { restoreFocusTimer(from: timer) }
         try? WorkspaceStorage.prepareDirectories()
+        refreshRecurringItems()
+        refreshExports()
         if seedData, storedSnapshot == nil { persist() }
         if isCloudSyncEnabled {
             if CloudSyncAvailability.isConfigured {
@@ -143,6 +146,11 @@ final class AppState: ObservableObject {
         spaces.first(where: { $0.id == space.id }) ?? defaultSpace
     }
 
+    static func taskScheduleDuration(_ task: HubTask) -> Double {
+        guard let estimate = task.estimatedMinutes, estimate > 0 else { return 1 }
+        return min(24, max(0.25, Double(estimate) / 60))
+    }
+
     var pomodoroLabel: String {
         let seconds = focusTimerMode == .countdown ? pomodoroRemaining : focusTimerElapsed
         if seconds >= 3600 {
@@ -167,6 +175,31 @@ final class AppState: ObservableObject {
 
     func navigate(to section: HubSection) {
         selectedSection = section
+    }
+
+    @discardableResult
+    func performSlashCommand(_ input: String) -> Bool {
+        switch input.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "/today": navigate(to: .today)
+        case "/inbox": navigate(to: .inbox)
+        case "/tasks": navigate(to: .tasks)
+        case "/calendar": navigate(to: .calendar)
+        case "/projects": navigate(to: .projects)
+        case "/notes": navigate(to: .notes)
+        case "/files": navigate(to: .files)
+        case "/journal": navigate(to: .journal)
+        case "/meetings": navigate(to: .meetings)
+        case "/reminders": navigate(to: .reminders)
+        case "/pomo", "/pomodoro":
+            startFocusTimer(.countdown(seconds: 25 * 60))
+            navigate(to: .pomodoro)
+        case "/timer", "/stopwatch":
+            startFocusTimer(.stopwatch)
+            navigate(to: .pomodoro)
+        case "/export": navigate(to: .export)
+        default: return false
+        }
+        return true
     }
 
     // MARK: - Spaces
@@ -208,6 +241,14 @@ final class AppState: ObservableObject {
 
     func moveSpaces(fromOffsets offsets: IndexSet, toOffset destination: Int) {
         spaces.move(fromOffsets: offsets, toOffset: destination)
+        persist()
+    }
+
+    func moveSpace(_ id: String, by offset: Int) {
+        guard let index = spaces.firstIndex(where: { $0.id == id }) else { return }
+        let destination = index + offset
+        guard spaces.indices.contains(destination) else { return }
+        spaces.swapAt(index, destination)
         persist()
     }
 
@@ -323,6 +364,14 @@ final class AppState: ObservableObject {
         persist()
     }
 
+    func updateCapture(_ id: UUID, text: String) {
+        guard let index = captures.firstIndex(where: { $0.id == id }) else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, captures[index].text != trimmed else { return }
+        captures[index].text = trimmed
+        persist()
+    }
+
     func deleteCapture(_ id: UUID) {
         captures.removeAll(where: { $0.id == id })
         persist()
@@ -341,7 +390,9 @@ final class AppState: ObservableObject {
         dueDate: Date = Date(),
         projectID: UUID? = nil,
         parentTaskID: UUID? = nil,
-        details: String = ""
+        estimatedMinutes: Int? = 30,
+        details: String = "",
+        recurrence: RecurrenceRule? = nil
     ) -> HubTask {
         let task = HubTask(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled task" : title,
@@ -349,7 +400,9 @@ final class AppState: ObservableObject {
             dueDate: dueDate,
             projectID: projectID,
             parentTaskID: parentTaskID,
-            details: details
+            estimatedMinutes: estimatedMinutes.flatMap { $0 > 0 ? $0 : nil },
+            details: details,
+            recurrence: recurrence
         )
         tasks.insert(task, at: 0)
         selectedTaskID = task.id
@@ -357,55 +410,169 @@ final class AppState: ObservableObject {
         return task
     }
 
-    func createTask(from draft: QuickCommandDraft) {
-        var task = addTask(title: draft.title, course: draft.course, dueDate: draft.dueDate)
+    @discardableResult
+    func createTask(from draft: QuickCommandDraft) -> HubTask {
+        var task = addTask(
+            title: draft.title,
+            course: draft.course,
+            dueDate: draft.dueDate,
+            estimatedMinutes: draft.estimatedMinutes ?? 30
+        )
         if let noteName = draft.linkedNote, let note = notes.first(where: { $0.title == noteName.replacingOccurrences(of: ".md", with: "") || $0.title == noteName }) {
             task.linkedNoteID = note.id
             task.linkedNote = noteName
             updateTask(task)
         }
-        captures.insert(WhiteboardCapture(text: draft.title, linkedTaskID: task.id), at: 0)
-        persist()
+        return task
+    }
+
+    @discardableResult
+    func createScheduledTask(from draft: QuickCommandDraft) -> HubTask {
+        let task = createTask(from: draft)
+        let plannedDate = draft.plannedDate ?? draft.dueDate
+        let components = Calendar.current.dateComponents([.hour, .minute], from: plannedDate)
+        let hour = Double(components.hour ?? 16) + Double(components.minute ?? 0) / 60
+        schedule(task.id, at: hour, on: plannedDate)
+        return task
     }
 
     func updateTask(_ task: HubTask) {
         guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
         var updated = task
         updated.course = canonicalSpace(task.course)
+        updated.scheduledHour = tasks[index].scheduledHour
+        updated.nextOccurrenceID = tasks[index].nextOccurrenceID
         tasks[index] = updated
+        let linkedBlockIndices = scheduleBlocks.indices.filter { scheduleBlocks[$0].linkedTaskID == updated.id }
+        for blockIndex in linkedBlockIndices {
+            scheduleBlocks[blockIndex].title = updated.title
+            scheduleBlocks[blockIndex].subtitle = updated.course.title
+            scheduleBlocks[blockIndex].course = updated.course
+            if linkedBlockIndices.count == 1 {
+                scheduleBlocks[blockIndex].duration = Self.taskScheduleDuration(updated)
+            }
+        }
         persist()
     }
 
     func deleteTask(_ taskID: UUID) {
-        tasks.removeAll(where: { $0.id == taskID || $0.parentTaskID == taskID })
-        scheduleBlocks.removeAll(where: { $0.linkedTaskID == taskID })
-        if selectedTaskID == taskID { selectedTaskID = tasks.first?.id }
+        var deletedIDs: Set<UUID> = [taskID]
+        while true {
+            let childIDs = Set(tasks.compactMap { task in
+                task.parentTaskID.map(deletedIDs.contains) == true ? task.id : nil
+            })
+            let previousCount = deletedIDs.count
+            deletedIDs.formUnion(childIDs)
+            if deletedIDs.count == previousCount { break }
+        }
+
+        tasks.removeAll(where: { deletedIDs.contains($0.id) })
+        scheduleBlocks.removeAll(where: { $0.linkedTaskID.map(deletedIDs.contains) == true })
+        if selectedTaskID.map(deletedIDs.contains) == true { selectedTaskID = tasks.first?.id }
+        if pomodoroLinkedTaskID.map(deletedIDs.contains) == true { pomodoroLinkedTaskID = nil }
         persist()
     }
 
     func toggleComplete(_ taskID: UUID) {
         guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
         tasks[index].isCompleted.toggle()
+        if tasks[index].isCompleted,
+           tasks[index].nextOccurrenceID == nil,
+           let recurrence = tasks[index].recurrence,
+           var nextDueDate = recurrence.nextDate(after: tasks[index].dueDate) {
+            while nextDueDate <= Date(), let followingDate = recurrence.nextDate(after: nextDueDate) {
+                nextDueDate = followingDate
+            }
+            let source = tasks[index]
+            let next = HubTask(
+                title: source.title,
+                course: source.course,
+                dueDate: nextDueDate,
+                projectID: source.projectID,
+                parentTaskID: source.parentTaskID,
+                linkedNoteID: source.linkedNoteID,
+                project: source.project,
+                linkedNote: source.linkedNote,
+                estimatedMinutes: source.estimatedMinutes,
+                details: source.details,
+                recurrence: recurrence
+            )
+            tasks[index].nextOccurrenceID = next.id
+            tasks.insert(next, at: 0)
+        }
         persist()
     }
 
-    func schedule(_ taskID: UUID, at hour: Double = 16, on date: Date = Date()) {
-        guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
-        tasks[index].scheduledHour = hour
+    @discardableResult
+    func schedule(
+        _ taskID: UUID,
+        at hour: Double = 16,
+        on date: Date = Date(),
+        durationMinutes: Int? = nil
+    ) -> ScheduleBlock? {
+        guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return nil }
         let task = tasks[index]
-        scheduleBlocks.removeAll(where: { $0.linkedTaskID == taskID && Calendar.current.isDate($0.date, inSameDayAs: date) })
-        scheduleBlocks.append(
-            ScheduleBlock(
-                title: task.title,
-                subtitle: task.course.title,
-                course: task.course,
-                startHour: hour,
-                duration: 1,
-                date: date,
-                linkedTaskID: task.id
-            )
+        let block = ScheduleBlock(
+            title: task.title,
+            subtitle: task.course.title,
+            course: task.course,
+            startHour: min(24 - 1.0 / 60.0, max(0, hour)),
+            duration: durationMinutes.map { min(24, max(5.0 / 60.0, Double($0) / 60)) }
+                ?? Self.taskScheduleDuration(task),
+            date: date,
+            linkedTaskID: task.id
         )
+        scheduleBlocks.append(block)
+        syncScheduledHour(for: taskID)
         persist()
+        return block
+    }
+
+    func schedulableTasks(matching query: String = "") -> [HubTask] {
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let openTasks = tasks.filter { !$0.isCompleted }
+        guard !normalized.isEmpty else { return openTasks }
+        return openTasks.filter {
+            $0.title.localizedCaseInsensitiveContains(normalized) ||
+            $0.course.title.localizedCaseInsensitiveContains(normalized)
+        }
+    }
+
+    @discardableResult
+    func scheduleTask(matching query: String, to date: Date, durationMinutes: Int? = nil) -> HubTask? {
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return nil }
+        let matches = schedulableTasks(matching: normalized)
+        guard let task = matches.first(where: {
+            $0.title.localizedCaseInsensitiveCompare(normalized) == .orderedSame
+        }) ?? matches.first else { return nil }
+
+        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+        let hour = Double(components.hour ?? 16) + Double(components.minute ?? 0) / 60
+        schedule(task.id, at: hour, on: date, durationMinutes: durationMinutes)
+        selectedTaskID = task.id
+        return tasks.first(where: { $0.id == task.id })
+    }
+
+    @discardableResult
+    func unschedule(_ taskID: UUID) -> Bool {
+        guard scheduleBlocks.contains(where: { $0.linkedTaskID == taskID }) else { return false }
+        scheduleBlocks.removeAll(where: { $0.linkedTaskID == taskID })
+        syncScheduledHour(for: taskID)
+        persist()
+        return true
+    }
+
+    func plannedWorkload(on date: Date) -> Int {
+        let calendar = Calendar.current
+        let nextDay = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
+        let taskIDs = Set(tasks.map(\.id))
+        return scheduleBlocks.reduce(0) { total, block in
+            guard let taskID = block.linkedTaskID, taskIDs.contains(taskID) else { return total }
+            let isInWindow = calendar.isDate(block.date, inSameDayAs: date)
+                || (calendar.isDate(block.date, inSameDayAs: nextDay) && block.startHour < 6)
+            return isInWindow ? total + Int((block.duration * 60).rounded()) : total
+        }
     }
 
     @discardableResult
@@ -421,20 +588,14 @@ final class AppState: ObservableObject {
         tasks[index].dueDate = date
         let components = Calendar.current.dateComponents([.hour, .minute], from: date)
         let scheduledHour = Double(components.hour ?? 16) + Double(components.minute ?? 0) / 60
-        tasks[index].scheduledHour = scheduledHour
         let task = tasks[index]
-        scheduleBlocks.removeAll(where: { $0.linkedTaskID == task.id })
-        scheduleBlocks.append(
-            ScheduleBlock(
-                title: task.title,
-                subtitle: task.course.title,
-                course: task.course,
-                startHour: scheduledHour,
-                duration: 1,
-                date: date,
-                linkedTaskID: task.id
-            )
-        )
+        if let block = scheduleBlocks
+            .filter({ $0.linkedTaskID == task.id })
+            .min(by: { scheduledDate(for: $0) < scheduledDate(for: $1) }) {
+            moveScheduleBlock(block.id, to: scheduledHour, on: date)
+        } else {
+            schedule(task.id, at: scheduledHour, on: date)
+        }
         selectedTaskID = task.id
         persist()
         return task
@@ -454,18 +615,41 @@ final class AppState: ObservableObject {
         updated.course = canonicalSpace(block.course)
         updated.subtitle = updated.course.title
         updated.startHour = min(24 - 1.0 / 60.0, max(0, block.startHour))
-        updated.duration = min(24 - updated.startHour, max(1.0 / 60.0, block.duration))
+        updated.duration = min(24, max(1.0 / 60.0, block.duration))
         scheduleBlocks[index] = updated
-        if let taskID = updated.linkedTaskID,
-           let taskIndex = tasks.firstIndex(where: { $0.id == taskID }) {
-            tasks[taskIndex].scheduledHour = updated.startHour
-        }
+        if let taskID = updated.linkedTaskID { syncScheduledHour(for: taskID) }
         persist()
     }
 
+    func moveScheduleBlock(_ id: UUID, to hour: Double, on date: Date) {
+        guard var block = scheduleBlocks.first(where: { $0.id == id }) else { return }
+        block.startHour = hour
+        block.date = date
+        updateScheduleBlock(block)
+    }
+
     func deleteScheduleBlock(_ id: UUID) {
+        let taskID = scheduleBlocks.first(where: { $0.id == id })?.linkedTaskID
         scheduleBlocks.removeAll(where: { $0.id == id })
+        if let taskID { syncScheduledHour(for: taskID) }
         persist()
+    }
+
+    private func syncScheduledHour(for taskID: UUID) {
+        guard let taskIndex = tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        tasks[taskIndex].scheduledHour = scheduleBlocks
+            .filter { $0.linkedTaskID == taskID }
+            .min(by: { scheduledDate(for: $0) < scheduledDate(for: $1) })?
+            .startHour
+    }
+
+    private func scheduledDate(for block: ScheduleBlock) -> Date {
+        let day = Calendar.current.startOfDay(for: block.date)
+        return Calendar.current.date(
+            byAdding: .minute,
+            value: Int((block.startHour * 60).rounded()),
+            to: day
+        ) ?? day
     }
 
     // MARK: - Projects
@@ -633,8 +817,36 @@ final class AppState: ObservableObject {
 
     func updateMeeting(_ meeting: MeetingRecord) {
         guard let index = meetings.firstIndex(where: { $0.id == meeting.id }) else { return }
-        meetings[index] = meeting
+        var updated = meeting
+        let title = meeting.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.title = title.isEmpty ? meetings[index].title : title
+        updated.nextOccurrenceID = meetings[index].nextOccurrenceID
+        meetings[index] = updated
         persist()
+    }
+
+    func refreshRecurringItems(now: Date = Date()) {
+        var createdMeeting = false
+        while let index = meetings.firstIndex(where: {
+            $0.recurrence != nil && $0.nextOccurrenceID == nil && $0.date <= now
+        }) {
+            guard let recurrence = meetings[index].recurrence,
+                  var nextDate = recurrence.nextDate(after: meetings[index].date) else { break }
+            while nextDate <= now, let followingDate = recurrence.nextDate(after: nextDate) {
+                nextDate = followingDate
+            }
+            let source = meetings[index]
+            let next = MeetingRecord(
+                title: source.title,
+                date: nextDate,
+                projectID: source.projectID,
+                recurrence: recurrence
+            )
+            meetings[index].nextOccurrenceID = next.id
+            meetings.append(next)
+            createdMeeting = true
+        }
+        if createdMeeting { persist() }
     }
 
     func deleteMeeting(_ id: UUID) {
@@ -730,6 +942,7 @@ final class AppState: ObservableObject {
     func exportWorkspace() {
         do {
             lastExportURLs = try WorkspaceStorage.export(tasks: tasks, projects: projects)
+            refreshExports()
             statusMessage = "Exported CSV and Markdown"
         } catch {
             statusMessage = "Export failed: \(error.localizedDescription)"
@@ -741,11 +954,41 @@ final class AppState: ObservableObject {
         do {
             let urls = try WorkspaceStorage.export(note: note)
             lastExportURLs = urls
-            statusMessage = "Exported PDF, RTF, and CSV"
+            refreshExports()
+            statusMessage = "Exported DOCX, PDF, RTF, and CSV"
             return urls
         } catch {
             statusMessage = "Note export failed: \(error.localizedDescription)"
             return []
+        }
+    }
+
+    func refreshExports() {
+        Task {
+            let files = await Task.detached { WorkspaceStorage.exportedFiles() }.value
+            exportedFiles = files
+        }
+    }
+
+    func deleteExport(_ url: URL) {
+        do {
+            try WorkspaceStorage.deleteExport(at: url)
+            lastExportURLs.removeAll(where: { $0.standardizedFileURL == url.standardizedFileURL })
+            refreshExports()
+            statusMessage = "Deleted \(url.lastPathComponent)"
+        } catch {
+            statusMessage = "Could not delete export: \(error.localizedDescription)"
+        }
+    }
+
+    func deleteAllExports() {
+        do {
+            try WorkspaceStorage.deleteAllExports()
+            lastExportURLs = []
+            refreshExports()
+            statusMessage = "Deleted all exports"
+        } catch {
+            statusMessage = "Could not clear exports: \(error.localizedDescription)"
         }
     }
 

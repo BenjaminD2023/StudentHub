@@ -8,6 +8,11 @@ struct CalendarWorkspaceView: View {
     @State private var selectionStart = 16.0
     @State private var selectionEnd = 17.0
 
+    private var unscheduledTasks: [HubTask] {
+        let scheduledTaskIDs = Set(appState.scheduleBlocks.compactMap(\.linkedTaskID))
+        return appState.tasks.filter { !$0.isCompleted && !scheduledTaskIDs.contains($0.id) }
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 18) {
@@ -69,7 +74,7 @@ struct CalendarWorkspaceView: View {
                     .foregroundStyle(HubPalette.secondaryText)
                 ScrollView {
                     LazyVStack(spacing: 7) {
-                        ForEach(appState.tasks.filter { !$0.isCompleted && $0.scheduledHour == nil }) { task in
+                        ForEach(unscheduledTasks) { task in
                             HStack(spacing: 9) {
                                 Circle().fill(task.course.accent).frame(width: 7, height: 7)
                                 Text(task.title).font(.system(size: 11, weight: .medium)).lineLimit(2)
@@ -80,6 +85,13 @@ struct CalendarWorkspaceView: View {
                             .background(HubPalette.grouped)
                             .clipShape(RoundedRectangle(cornerRadius: 9))
                             .draggable(task.id.uuidString)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    appState.deleteTask(task.id)
+                                } label: {
+                                    Label("Delete task", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                 }
@@ -107,7 +119,7 @@ struct CalendarSelectionGrid: View {
     let date: Date
     @Binding var selectionStart: Double
     @Binding var selectionEnd: Double
-    private let startHour = 8.0
+    private let startHour = 0.0
     private let endHour = 24.0
     private let rowHeight = 52.0
     @State private var dragAnchor: Double?
@@ -155,8 +167,14 @@ struct CalendarSelectionGrid: View {
                                         appState.selectedTaskID = taskID
                                         appState.navigate(to: .tasks)
                                     }
+                                    Divider()
+                                    Button(role: .destructive) {
+                                        appState.deleteTask(taskID)
+                                    } label: {
+                                        Label("Delete linked task", systemImage: "trash")
+                                    }
                                 }
-                                Button("Delete", role: .destructive) { appState.deleteScheduleBlock(block.id) }
+                                Button("Remove from schedule") { appState.deleteScheduleBlock(block.id) }
                             }
                     }
                 }
@@ -538,16 +556,26 @@ struct ExportWorkspaceView: View {
             .buttonStyle(HubProminentButtonStyle())
             .controlSize(.large)
 
-            if !appState.lastExportURLs.isEmpty {
+            if !appState.exportedFiles.isEmpty {
                 Divider()
-                HubSectionTitle(title: "Latest export")
-                ForEach(appState.lastExportURLs, id: \.self) { url in
+                HStack {
+                    HubSectionTitle(title: "Exported files", trailing: "\(appState.exportedFiles.count)")
+                    Spacer()
+                    Button("Delete all", role: .destructive) { appState.deleteAllExports() }
+                        .buttonStyle(.bordered)
+                }
+                ForEach(appState.exportedFiles, id: \.self) { url in
                     HStack {
                         Image(systemName: "doc")
                         Text(url.lastPathComponent).font(.system(size: 12, weight: .medium))
                         Spacer()
                         Button("Open") { OpenURLHelper.open(url) }.buttonStyle(.bordered)
                         Button("Reveal") { OpenURLHelper.reveal(url) }.buttonStyle(.bordered)
+                        Button(role: .destructive) { appState.deleteExport(url) } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .help("Delete \(url.lastPathComponent)")
                     }
                     .padding(12)
                     .hubPanel(cornerRadius: 12)

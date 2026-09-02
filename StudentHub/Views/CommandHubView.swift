@@ -12,18 +12,8 @@ struct CommandHubView: View {
     @EnvironmentObject private var appState: AppState
     @State private var scope: Scope = .today
     @State private var command = ""
+    @FocusState private var commandFocused: Bool
     let onClose: () -> Void
-
-    private let hints = [
-        CommandHint(command: "add Chem lab report tomorrow 7:30 pm", detail: "Create a dated task", icon: "calendar.badge.plus"),
-        CommandHint(command: "move Court case prep to Friday 4 pm", detail: "Find and reschedule a task", icon: "arrow.right.circle"),
-        CommandHint(command: "/capture Ask Ms. Li about sources", detail: "Save an unprocessed thought", icon: "square.and.pencil"),
-        CommandHint(command: "/project Research fair Jul 31", detail: "Create a project with a deadline", icon: "folder.badge.plus"),
-        CommandHint(command: "/note Debate evidence", detail: "Create and open a Markdown note", icon: "doc.badge.plus"),
-        CommandHint(command: "start 25 minute countdown", detail: "Start a focus countdown", icon: "timer"),
-        CommandHint(command: "start timer", detail: "Start a stopwatch from zero", icon: "stopwatch"),
-        CommandHint(command: "/notes", detail: "Open the notes workspace", icon: "doc.text")
-    ]
 
     private var filteredTasks: [HubTask] {
         let base = scope == .today
@@ -47,9 +37,11 @@ struct CommandHubView: View {
             commandField
 
             ScrollView {
-                commandGuidance
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
+                if !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    commandGuidance
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                }
 
                 VStack(spacing: 0) {
                     HStack {
@@ -112,6 +104,7 @@ struct CommandHubView: View {
             keyboardHints
         }
         .background(Color.hubBackground)
+        .onAppear { commandFocused = true }
     }
 
     private var header: some View {
@@ -149,9 +142,10 @@ struct CommandHubView: View {
         HStack(spacing: 10) {
             Image(systemName: "chevron.right")
                 .foregroundStyle(.secondary)
-            TextField("Try “add essay next Friday 4 pm” or type /", text: $command)
+            TextField("Capture, search, or run a command", text: $command)
                 .font(.title3)
                 .textFieldStyle(.plain)
+                .focused($commandFocused)
                 .onSubmit { applyCommand() }
             if !command.isEmpty {
                 Button { command = "" } label: { Image(systemName: "xmark.circle.fill") }
@@ -170,41 +164,10 @@ struct CommandHubView: View {
     @ViewBuilder
     private var commandGuidance: some View {
         let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty || trimmed.hasPrefix("/") {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Label(trimmed.hasPrefix("/") ? "Commands" : "Try a command", systemImage: "lightbulb")
-                        .font(.callout.weight(.semibold))
-                    Spacer()
-                    Text("Try Jul 22, 7/22, in 3 days, 下周三, or 7月20日")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(filteredHints(for: trimmed)) { hint in
-                    Button {
-                        command = hint.command
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: hint.icon)
-                                .frame(width: 18)
-                                .foregroundStyle(HubPalette.hubAccent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(hint.command).font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                Text(hint.detail).font(.caption2).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "arrow.up.left").font(.caption2).foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 10)
-                        .frame(minHeight: 42)
-                        .background(HubPalette.selected.opacity(0.6))
-                        .clipShape(RoundedRectangle(cornerRadius: 9))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(12)
-            .hubPanel(cornerRadius: 12)
+        if isSlashSchedule(trimmed) {
+            scheduleTaskGuidance
+        } else if trimmed.hasPrefix("/") && !SlashCommandDefinition.hasEnteredArgument(in: command) {
+            slashCommandGuidance
         } else {
             let interpretation = CommandInterpreter.interpret(trimmed, spaces: appState.spaces)
             VStack(alignment: .leading, spacing: 10) {
@@ -238,14 +201,177 @@ struct CommandHubView: View {
                         .font(.caption)
                         .foregroundStyle(match == nil ? HubPalette.red : HubPalette.secondaryText)
                 } else if interpretation.intent.usesDate {
-                    Text("Due \(interpretation.draft.dueDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))")
-                        .font(.caption)
-                        .foregroundStyle(HubPalette.secondaryText)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(interpretation.intent.isScheduling ? "Planned" : "Due") \((interpretation.intent.isScheduling ? interpretation.plannedDate : interpretation.draft.dueDate).formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))")
+                        if interpretation.intent == .scheduleTask, interpretation.draft.plannedDate != nil {
+                            Text("Due \(interpretation.draft.dueDate.formatted(date: .abbreviated, time: .shortened))")
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(HubPalette.secondaryText)
                 }
             }
             .padding(12)
             .hubPanel(cornerRadius: 12)
         }
+    }
+
+    private var slashCommandGuidance: some View {
+        let commands = SlashCommandDefinition.matching(command)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Slash commands", systemImage: "command")
+                    .font(.callout.weight(.semibold))
+                Spacer()
+                Text("Type to filter")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(spacing: 0) {
+                ForEach(Array(commands.enumerated()), id: \.element.id) { index, suggestion in
+                    Button {
+                        command = suggestion.insertionText
+                        DispatchQueue.main.async { commandFocused = true }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: suggestion.icon)
+                                .frame(width: 18)
+                                .foregroundStyle(HubPalette.hubAccent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(suggestion.usage)
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(HubPalette.primaryText)
+                                Text(suggestion.detail)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: suggestion.takesArgument ? "arrow.right" : "return")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if index < commands.count - 1 {
+                        Divider().padding(.leading, 38)
+                    }
+                }
+            }
+
+            if commands.isEmpty {
+                Text("No slash command matches “\(command)”.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .hubPanel(cornerRadius: 12)
+    }
+
+    private var scheduleTaskGuidance: some View {
+        let interpretation = CommandInterpreter.interpret(command, spaces: appState.spaces)
+        let query: String
+        if case .scheduleExistingTask(let value) = interpretation.intent {
+            query = value
+        } else {
+            query = ""
+        }
+        let tasks = appState.schedulableTasks(matching: query)
+        let visibleTasks = Array(tasks.prefix(8))
+        let hasTiming = interpretation.draft.recognizedTokens.contains {
+            $0.kind == .date || $0.kind == .time
+        }
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Select a task to schedule")
+                        .font(.callout.weight(.semibold))
+                    Text("Choose one, then type its date and time after “at”.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text("\(tasks.count) matches")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 8) {
+                Label("Planned", systemImage: "calendar.badge.clock")
+                    .foregroundStyle(HubPalette.hubAccent)
+                Spacer()
+                Text("\(hasTiming ? "" : "Default · ")\(interpretation.plannedDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))")
+                    .monospacedDigit()
+                    .foregroundStyle(hasTiming ? HubPalette.primaryText : HubPalette.secondaryText)
+            }
+            .font(.caption.weight(.semibold))
+
+            VStack(spacing: 0) {
+                ForEach(Array(visibleTasks.enumerated()), id: \.element.id) { index, task in
+                    Button {
+                        command = "/schedule \(task.title) at "
+                        DispatchQueue.main.async { commandFocused = true }
+                    } label: {
+                        HStack(spacing: 10) {
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill(task.course.accent)
+                                .frame(width: 3, height: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(task.title)
+                                    .font(.callout.weight(.semibold))
+                                    .foregroundStyle(HubPalette.primaryText)
+                                    .lineLimit(1)
+                                Text([task.course.title, task.estimatedDurationLabel].compactMap { $0 }.joined(separator: " · "))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if appState.scheduleBlocks.contains(where: { $0.linkedTaskID == task.id }) {
+                                Text("Reschedule")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(HubPalette.hubAccent)
+                            }
+                            Image(systemName: "arrow.right")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            appState.deleteTask(task.id)
+                        } label: {
+                            Label("Delete task", systemImage: "trash")
+                        }
+                    }
+
+                    if index < visibleTasks.count - 1 {
+                        Divider().padding(.leading, 24)
+                    }
+                }
+            }
+
+            if tasks.isEmpty {
+                Text("No unfinished task matches “\(query)”.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("Create new: schedule Essay outline at 4 pm 45m")
+                .font(.caption2.monospaced())
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .hubPanel(cornerRadius: 12)
     }
 
     private var keyboardHints: some View {
@@ -264,81 +390,98 @@ struct CommandHubView: View {
 
     private func applyCommand() {
         let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
-        switch trimmed.lowercased() {
-        case "/today": scope = .today
-        case "/all", "/tasks":
+        guard !trimmed.isEmpty else { return }
+        let lowered = trimmed.lowercased()
+        if lowered == "/all" {
             scope = .all
-            if trimmed.lowercased() == "/tasks" { appState.navigate(to: .tasks) }
-        case "/calendar": appState.navigate(to: .calendar)
-        case "/projects": appState.navigate(to: .projects)
-        case "/notes": appState.navigate(to: .notes)
-        case "/files": appState.navigate(to: .files)
-        case "/meetings": appState.navigate(to: .meetings)
-        case "/reminders": appState.navigate(to: .reminders)
-        case "/pomo", "/pomodoro":
-            appState.startFocusTimer(.countdown(seconds: 25 * 60))
-            appState.navigate(to: .pomodoro)
-        case "/export": appState.navigate(to: .export)
-        default:
-            let interpretation = CommandInterpreter.interpret(trimmed, spaces: appState.spaces)
-            switch interpretation.intent {
-            case .createTask:
-                appState.createTask(from: interpretation.draft)
-                appState.statusMessage = "Created \(interpretation.draft.title)"
+            command = ""
+            return
+        }
+        if appState.performSlashCommand(trimmed) {
+            if lowered == "/today" { scope = .today }
+            if lowered == "/tasks" { scope = .all }
+            command = ""
+            return
+        }
+
+        let interpretation = CommandInterpreter.interpret(trimmed, spaces: appState.spaces)
+        switch interpretation.intent {
+        case .createTask:
+            appState.createTask(from: interpretation.draft)
+            appState.statusMessage = "Created \(interpretation.draft.title)"
+            command = ""
+            scope = .today
+        case .scheduleTask:
+            appState.createScheduledTask(from: interpretation.draft)
+            appState.statusMessage = "Scheduled \(interpretation.draft.title) for \(interpretation.plannedDate.formatted(date: .abbreviated, time: .shortened))"
+            appState.navigate(to: .today)
+            command = ""
+            scope = .today
+        case .scheduleExistingTask(let query):
+            if let task = appState.scheduleTask(
+                matching: query,
+                to: interpretation.plannedDate,
+                durationMinutes: interpretation.draft.estimatedMinutes
+            ) {
+                appState.statusMessage = "Scheduled \(task.title) for \(interpretation.plannedDate.formatted(date: .abbreviated, time: .shortened))"
+                appState.navigate(to: .today)
                 command = ""
                 scope = .today
-            case .capture(let text):
-                guard !text.isEmpty else {
-                    appState.statusMessage = "Type something after /capture"
-                    return
-                }
-                appState.addCapture(text)
-                command = ""
-            case .createProject:
-                let deadline = interpretation.draft.recognizedTokens.contains(where: { $0.kind == .date })
-                    ? interpretation.draft.dueDate
-                    : (Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date())
-                let project = appState.addProject(
-                    title: interpretation.draft.title == "Untitled task" ? "Untitled project" : interpretation.draft.title,
-                    course: interpretation.draft.course,
-                    deadline: deadline
-                )
-                appState.statusMessage = "Created project \(project.title)"
-                appState.navigate(to: .projects)
-                command = ""
-            case .createNote:
-                let title = interpretation.draft.title == "Untitled task" ? "Untitled note" : interpretation.draft.title
-                let note = appState.addNote(title: title, folder: interpretation.draft.course.title, course: interpretation.draft.course)
-                appState.openNote(note.id)
-                appState.navigate(to: .notes)
-                command = ""
-            case .rescheduleTask(let query):
-                if let task = appState.rescheduleTask(matching: query, to: interpretation.draft.dueDate) {
-                    appState.statusMessage = "Moved \(task.title) to \(interpretation.draft.dueDate.formatted(date: .abbreviated, time: .shortened))"
-                    command = ""
-                    scope = .today
-                } else {
-                    appState.statusMessage = "No task matched “\(query)”"
-                }
-            case .search:
-                scope = .search
-            case .startTimer(let timer):
-                appState.startFocusTimer(timer)
-                appState.navigate(to: .pomodoro)
-                command = ""
+            } else {
+                appState.statusMessage = query.isEmpty ? "Choose a task after /schedule" : "No task matched “\(query)”"
             }
+        case .capture(let text):
+            guard !text.isEmpty else {
+                appState.statusMessage = "Type something after /capture"
+                return
+            }
+            appState.addCapture(text)
+            command = ""
+        case .createProject:
+            let deadline = interpretation.draft.recognizedTokens.contains(where: { $0.kind == .date })
+                ? interpretation.draft.dueDate
+                : (Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date())
+            let project = appState.addProject(
+                title: interpretation.draft.title == "Untitled task" ? "Untitled project" : interpretation.draft.title,
+                course: interpretation.draft.course,
+                deadline: deadline
+            )
+            appState.statusMessage = "Created project \(project.title)"
+            appState.navigate(to: .projects)
+            command = ""
+        case .createNote:
+            let title = interpretation.draft.title == "Untitled task" ? "Untitled note" : interpretation.draft.title
+            let note = appState.addNote(title: title, folder: interpretation.draft.course.title, course: interpretation.draft.course)
+            appState.openNote(note.id)
+            appState.navigate(to: .notes)
+            command = ""
+        case .rescheduleTask(let query):
+            if let task = appState.rescheduleTask(matching: query, to: interpretation.draft.dueDate) {
+                appState.statusMessage = "Moved \(task.title) to \(interpretation.draft.dueDate.formatted(date: .abbreviated, time: .shortened))"
+                command = ""
+                scope = .today
+            } else {
+                appState.statusMessage = "No task matched “\(query)”"
+            }
+        case .search:
+            scope = .search
+        case .startTimer(let timer):
+            appState.startFocusTimer(timer)
+            appState.navigate(to: .pomodoro)
+            command = ""
         }
     }
 
-    private func filteredHints(for input: String) -> [CommandHint] {
+    private func isSlashSchedule(_ input: String) -> Bool {
         let lowered = input.lowercased()
-        guard !lowered.isEmpty, lowered != "/" else { return hints }
-        return hints.filter { $0.command.lowercased().contains(lowered) || $0.detail.lowercased().contains(lowered) }
+        return lowered == "/schedule" || lowered.hasPrefix("/schedule ")
     }
 
     private func intentIcon(_ intent: CommandIntent) -> String {
         switch intent {
         case .createTask: "checkmark.square"
+        case .scheduleTask: "calendar.badge.plus"
+        case .scheduleExistingTask: "calendar.badge.plus"
         case .capture: "square.and.pencil"
         case .createProject: "folder.badge.plus"
         case .createNote: "doc.badge.plus"
@@ -351,30 +494,45 @@ struct CommandHubView: View {
 }
 
 private extension CommandIntent {
+    var isScheduling: Bool {
+        switch self {
+        case .scheduleTask, .scheduleExistingTask: true
+        default: false
+        }
+    }
+
     var usesDate: Bool {
         switch self {
-        case .createTask, .createProject, .rescheduleTask: true
+        case .createTask, .scheduleTask, .scheduleExistingTask, .createProject, .rescheduleTask: true
         case .capture, .createNote, .search, .startTimer: false
         }
     }
-}
-
-private struct CommandHint: Identifiable {
-    let command: String
-    let detail: String
-    let icon: String
-    var id: String { command }
 }
 
 private struct CaptureRow: View {
     @EnvironmentObject private var appState: AppState
     let capture: WhiteboardCapture
 
+    @State private var draft = ""
+    @FocusState private var isFocused: Bool
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(capture.text)
+            TextField("Capture", text: $draft, axis: .vertical)
                 .font(.system(size: 12, weight: .medium))
-                .lineLimit(3)
+                .textFieldStyle(.plain)
+                .lineLimit(1...6)
+                .focused($isFocused)
+                .onSubmit(commit)
+                .onChange(of: isFocused) { _, focused in
+                    if !focused { commit() }
+                }
+                .onChange(of: capture.text) { _, newValue in
+                    if !isFocused { draft = newValue }
+                }
+                .onAppear { draft = capture.text }
+                .accessibilityLabel("Scratchpad note")
+                .accessibilityHint("Edit this capture")
             HStack(spacing: 8) {
                 Text(capture.createdAt.formatted(date: .omitted, time: .shortened))
                     .font(.caption2)
@@ -412,6 +570,16 @@ private struct CaptureRow: View {
         .padding(10)
         .background(HubPalette.selected.opacity(0.65))
         .clipShape(RoundedRectangle(cornerRadius: 9))
+    }
+
+    private func commit() {
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            draft = capture.text
+            return
+        }
+        appState.updateCapture(capture.id, text: trimmed)
+        draft = trimmed
     }
 }
 
@@ -460,6 +628,13 @@ private struct TaskRow: View {
         .padding(.horizontal, 16)
         .frame(minHeight: 72)
         .background(appState.selectedTaskID == task.id ? Color.accentColor.opacity(0.10) : .clear)
+        .contextMenu {
+            Button(role: .destructive) {
+                appState.deleteTask(task.id)
+            } label: {
+                Label("Delete task", systemImage: "trash")
+            }
+        }
     }
 }
 
@@ -515,6 +690,13 @@ private struct TaskDetail: View {
 
         Button("Complete", systemImage: "checkmark.circle") {
             appState.toggleComplete(task.id)
+        }
+        .buttonStyle(.bordered)
+
+        Button(role: .destructive) {
+            appState.deleteTask(task.id)
+        } label: {
+            Label("Delete", systemImage: "trash")
         }
         .buttonStyle(.bordered)
     }

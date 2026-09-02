@@ -18,8 +18,9 @@ struct StudentHubApp: App {
                 .frame(minWidth: 980, minHeight: 700)
                 #endif
                 .onChange(of: scenePhase) { _, phase in
-                    guard phase == .active, appState.isCloudSyncEnabled else { return }
-                    Task { await appState.syncNow() }
+                    guard phase == .active else { return }
+                    appState.refreshRecurringItems()
+                    if appState.isCloudSyncEnabled { Task { await appState.syncNow() } }
                 }
         }
         #if os(macOS)
@@ -35,8 +36,9 @@ struct StudentHubApp: App {
 
                 #if os(macOS)
                 Button("Toggle Quick Command (⌥ Space)") {
-                    NotificationCenter.default.post(name: .toggleQuickPanel, object: nil)
+                    QuickPanelController.shared.toggle()
                 }
+                .keyboardShortcut(.space, modifiers: [.option])
                 #else
                 Button("Toggle Quick Command") {
                     appState.isQuickCommandPresented.toggle()
@@ -55,6 +57,19 @@ struct StudentHubApp: App {
         }
 
         #if os(macOS)
+        MenuBarExtra {
+            MacMenuBarView()
+                .environmentObject(appState)
+                .preferredColorScheme(appState.appearance.colorScheme)
+        } label: {
+            Label(
+                "\(appState.tasks.filter { !$0.isCompleted }.count)",
+                systemImage: "checklist"
+            )
+            .accessibilityLabel("\(appState.tasks.filter { !$0.isCompleted }.count) open todos")
+        }
+        .menuBarExtraStyle(.window)
+
         WindowGroup("Note", for: UUID.self) { $noteID in
             if let noteID {
                 NoteWindowView(noteID: noteID)

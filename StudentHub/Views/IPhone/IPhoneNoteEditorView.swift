@@ -61,23 +61,12 @@ struct IPhoneNoteEditorView: View {
                                     d.markdown = newValue
                                     self.draft = d
                                 }
-                            ), targetLine: nil, onSelectionChange: { markdownSelection = $0 })
+                            ), targetLine: nil, selection: $markdownSelection, onSelectionChange: { markdownSelection = $0 })
                             .frame(minHeight: 360)
                         }
-                        Section("Markdown tools") {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(MarkdownTool.allCases) { tool in
-                                        Button {
-                                            insert(tool)
-                                        } label: {
-                                            Label(tool.title, systemImage: tool.icon)
-                                        }
-                                        .buttonStyle(.bordered)
-                                    }
-                                }
-                            }
-                            Text("Select text to format it, or insert at the cursor.")
+                        Section("Formatting") {
+                            NoteFormattingBar(onTool: insert, onColor: applyColor)
+                            Text("Keyboard: ⌘B bold, ⌘I italic, ⌘K link.")
                                 .font(.caption)
                                 .foregroundStyle(HubPalette.secondaryText)
                         }
@@ -86,7 +75,7 @@ struct IPhoneNoteEditorView: View {
                                 appState.updateNote(draft)
                                 exportURLs = appState.exportNote(draft)
                             } label: {
-                                Label("Create PDF, Word-compatible RTF & CSV", systemImage: "square.and.arrow.up")
+                                Label("Create DOCX, PDF, RTF & CSV", systemImage: "square.and.arrow.up")
                             }
                             if !exportURLs.isEmpty {
                                 ShareLink(items: exportURLs) {
@@ -139,7 +128,15 @@ struct IPhoneNoteEditorView: View {
 
     private func insert(_ tool: MarkdownTool) {
         guard var draft else { return }
-        let result = tool.applying(to: draft.markdown, selection: markdownSelection)
+        let result = tool.applyingShortcut(to: draft.markdown, selection: markdownSelection)
+        draft.markdown = result.text
+        markdownSelection = result.selection
+        self.draft = draft
+    }
+
+    private func applyColor(_ color: MarkdownTextColor) {
+        guard var draft else { return }
+        let result = MarkdownColorFormatting.applying(color, to: draft.markdown, selection: markdownSelection)
         draft.markdown = result.text
         markdownSelection = result.selection
         self.draft = draft

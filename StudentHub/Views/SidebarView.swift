@@ -234,6 +234,20 @@ private struct SpaceEditorRow: View {
                 .buttonStyle(.borderless)
                 .disabled(!hasChanges || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
+            HStack(spacing: 2) {
+                Button { appState.moveSpace(space.id, by: -1) } label: {
+                    Image(systemName: "chevron.up")
+                }
+                .disabled(appState.spaces.first?.id == space.id)
+                .help("Move up")
+                Button { appState.moveSpace(space.id, by: 1) } label: {
+                    Image(systemName: "chevron.down")
+                }
+                .disabled(appState.spaces.last?.id == space.id)
+                .help("Move down")
+            }
+            .buttonStyle(.borderless)
+
             if appState.spaces.count > 1 {
                 Menu {
                     Button("Delete Space & Contents…", role: .destructive) {

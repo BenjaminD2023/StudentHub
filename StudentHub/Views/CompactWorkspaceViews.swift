@@ -31,6 +31,7 @@ private struct CompactTasksView: View {
     let inboxOnly: Bool
     @State private var title = ""
     @State private var course: Course = .general
+    @State private var estimatedMinutes: Int? = 30
     @State private var editingTaskID: UUID?
 
     private var visibleTasks: [HubTask] {
@@ -60,8 +61,16 @@ private struct CompactTasksView: View {
                             .buttonStyle(HubProminentButtonStyle())
                     }
                     Divider()
-                    Picker("Course", selection: $course) {
-                        ForEach(appState.spaces) { Text($0.title).tag($0) }
+                    HStack {
+                        Picker("Course", selection: $course) {
+                            ForEach(appState.spaces) { Text($0.title).tag($0) }
+                        }
+                        Picker("Predicted time", selection: $estimatedMinutes) {
+                            Text("No estimate").tag(Optional<Int>.none)
+                            ForEach([15, 30, 45, 60, 90, 120], id: \.self) { minutes in
+                                Text(minutes.studyDurationLabel).tag(Optional(minutes))
+                            }
+                        }
                     }
                 }
                 .padding(14)
@@ -80,22 +89,41 @@ private struct CompactTasksView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(task.title).font(.system(size: 14, weight: .semibold)).strikethrough(task.isCompleted)
-                                Text("\(task.course.title) • \(task.dueDate.formatted(date: .abbreviated, time: .shortened))")
-                                    .font(.caption)
-                                    .foregroundStyle(HubPalette.secondaryText)
+                                HStack(spacing: 3) {
+                                    Text("\(task.course.title) • \(task.dueDate.formatted(date: .abbreviated, time: .shortened))")
+                                    if let estimate = task.estimatedDurationLabel {
+                                        Text("• \(estimate)")
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(HubPalette.secondaryText)
+                                .lineLimit(1)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .buttonStyle(.plain)
+                        if let recurrence = task.recurrence {
+                            Image(systemName: "repeat").help(recurrence.title)
+                        }
                         Image(systemName: "chevron.right").foregroundStyle(HubPalette.tertiaryText)
                     }
                     .padding(13)
                     .hubPanel(cornerRadius: 12)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            appState.deleteTask(task.id)
+                        } label: {
+                            Label("Delete task", systemImage: "trash")
+                        }
+                    }
                 }
             }
             .padding(18)
         }
         .background(HubPalette.background)
+        .onAppear {
+            if !appState.spaces.contains(course) { course = appState.defaultSpace }
+        }
         .sheet(isPresented: editingTaskPresented) {
             if let task = appState.tasks.first(where: { $0.id == editingTaskID }) {
                 TaskInspectorView(task: task)
@@ -110,7 +138,12 @@ private struct CompactTasksView: View {
     private func addTask() {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        appState.addTask(title: trimmed, course: course, dueDate: Date().addingTimeInterval(3600 * 4))
+        appState.addTask(
+            title: trimmed,
+            course: course,
+            dueDate: Date().addingTimeInterval(3600 * 4),
+            estimatedMinutes: estimatedMinutes
+        )
         title = ""
     }
 }
@@ -249,22 +282,20 @@ private struct CompactNoteEditor: View {
                 ObsidianLiveMarkdownEditor(
                     text: $draft.markdown,
                     targetLine: nil,
+                    selection: $markdownSelection,
                     onSelectionChange: { markdownSelection = $0 }
                 )
                     .frame(minHeight: 240)
                     .padding(8)
                     .background(HubPalette.grouped)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(MarkdownTool.allCases) { tool in
-                            Button { insert(tool) } label: { Label(tool.title, systemImage: tool.icon) }
-                                .buttonStyle(.bordered)
-                        }
-                    }
-                }
+                NoteFormattingBar(onTool: insert, onColor: applyColor)
                 DisclosureGroup("Live Markdown preview", isExpanded: $showsPreview) {
-                    MarkdownReadingView(source: draft.markdown, targetLine: nil)
+                    MarkdownReadingView(
+                        source: draft.markdown,
+                        targetLine: nil,
+                        onToggleChecklist: toggleChecklist
+                    )
                         .frame(minHeight: 220)
                         .background(HubPalette.grouped)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -297,7 +328,7 @@ private struct CompactNoteEditor: View {
             .safeAreaInset(edge: .bottom) {
                 if !exportURLs.isEmpty {
                     ShareLink(items: exportURLs) {
-                        Label("Share PDF, RTF & CSV", systemImage: "square.and.arrow.up")
+                        Label("Share DOCX, PDF, RTF & CSV", systemImage: "square.and.arrow.up")
                     }
                     .buttonStyle(.borderedProminent)
                     .padding(10)
@@ -309,7 +340,19 @@ private struct CompactNoteEditor: View {
     }
 
     private func insert(_ tool: MarkdownTool) {
-        let result = tool.applying(to: draft.markdown, selection: markdownSelection)
+        let result = tool.applyingShortcut(to: draft.markdown, selection: markdownSelection)
+        draft.markdown = result.text
+        markdownSelection = result.selection
+    }
+
+    private func applyColor(_ color: MarkdownTextColor) {
+        let result = MarkdownColorFormatting.applying(color, to: draft.markdown, selection: markdownSelection)
+        draft.markdown = result.text
+        markdownSelection = result.selection
+    }
+
+    private func toggleChecklist(_ line: Int) {
+        guard let result = MarkdownChecklist.togglingLine(in: draft.markdown, lineNumber: line) else { return }
         draft.markdown = result.text
         markdownSelection = result.selection
     }
@@ -522,6 +565,9 @@ private struct CompactMeetingsView: View {
                                 Text(meeting.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
+                            if let recurrence = meeting.recurrence {
+                                Image(systemName: "repeat").help(recurrence.title)
+                            }
                             if !meeting.summary.isEmpty { Image(systemName: "sparkles") }
                             Image(systemName: "chevron.right")
                         }
@@ -557,7 +603,12 @@ private struct CompactMeetingEditor: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    TextField("Meeting title", text: $draft.title).font(.title2.bold()).textFieldStyle(.roundedBorder)
+                    TextField("Meeting title", text: $draft.title)
+                        .font(.title2.bold())
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { appState.updateMeeting(draft) }
+                    DatePicker("When", selection: $draft.date)
+                    HubRecurrencePicker(selection: $draft.recurrence)
                     Picker("Project", selection: $draft.projectID) {
                         Text("No project").tag(Optional<UUID>.none)
                         ForEach(appState.projects) { Text($0.title).tag(Optional($0.id)) }
@@ -581,6 +632,7 @@ private struct CompactMeetingEditor: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { appState.updateMeeting(draft); dismiss() } }
             }
+            .onDisappear { appState.updateMeeting(draft) }
         }
     }
 }
@@ -647,9 +699,14 @@ private struct CompactExportView: View {
                 .buttonStyle(HubProminentButtonStyle())
                 .controlSize(.large)
 
-                if !appState.lastExportURLs.isEmpty {
-                    HubSectionTitle(title: "Latest export")
-                    ForEach(appState.lastExportURLs, id: \.self) { url in
+                if !appState.exportedFiles.isEmpty {
+                    HStack {
+                        HubSectionTitle(title: "Exported files", trailing: "\(appState.exportedFiles.count)")
+                        Spacer()
+                        Button("Delete all", role: .destructive) { appState.deleteAllExports() }
+                            .font(.caption.weight(.semibold))
+                    }
+                    ForEach(appState.exportedFiles, id: \.self) { url in
                         HStack(spacing: 12) {
                             Image(systemName: "doc")
                             Text(url.lastPathComponent)
@@ -660,6 +717,10 @@ private struct CompactExportView: View {
                                 Image(systemName: "square.and.arrow.up")
                             }
                             .accessibilityLabel("Share \(url.lastPathComponent)")
+                            Button(role: .destructive) { appState.deleteExport(url) } label: {
+                                Image(systemName: "trash")
+                            }
+                            .accessibilityLabel("Delete \(url.lastPathComponent)")
                         }
                         .padding(14)
                         .hubPanel(cornerRadius: 12)
