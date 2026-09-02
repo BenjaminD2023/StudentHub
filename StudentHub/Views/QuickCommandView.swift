@@ -47,11 +47,29 @@ struct QuickCommandView: View {
     let onDismiss: () -> Void
 
     private var draft: QuickCommandDraft {
-        CommandParser.parse(input, spaces: appState.spaces)
+        interpretation.draft
     }
 
     private var interpretation: CommandInterpretation {
         CommandInterpreter.interpret(input, spaces: appState.spaces)
+    }
+
+    private var trimmedInput: String {
+        input.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isSlashInput: Bool { trimmedInput.hasPrefix("/") }
+    private var isSlashSchedule: Bool {
+        let lowered = trimmedInput.lowercased()
+        return lowered == "/schedule" || lowered.hasPrefix("/schedule ")
+    }
+    private var showsSlashBrowser: Bool {
+        isSlashInput && !isSlashSchedule && !SlashCommandDefinition.hasEnteredArgument(in: input)
+    }
+
+    private var existingScheduleQuery: String {
+        guard case .scheduleExistingTask(let query) = interpretation.intent else { return "" }
+        return query
     }
 
     var body: some View {
@@ -61,18 +79,33 @@ struct QuickCommandView: View {
 
             GeometryReader { proxy in
                 let compact = proxy.size.width < 620
-                if compact {
+                if showsSlashBrowser {
+                    slashBrowser
+                } else if compact {
                     ScrollView {
                         VStack(spacing: 0) {
-                            actionsList
+                            if isSlashSchedule {
+                                scheduleTaskPicker
+                                    .padding(16)
+                            } else {
+                                actionsList
+                            }
                             Divider()
                             preview
                         }
                     }
                 } else {
                     HStack(spacing: 0) {
-                        actionsList
+                        if isSlashSchedule {
+                            ScrollView {
+                                scheduleTaskPicker
+                                    .padding(16)
+                            }
                             .frame(width: max(300, proxy.size.width * 0.46))
+                        } else {
+                            actionsList
+                                .frame(width: max(300, proxy.size.width * 0.46))
+                        }
                         Divider()
                         preview
                     }
@@ -152,6 +185,156 @@ struct QuickCommandView: View {
     }
 
     // MARK: - Actions list
+
+    private var slashBrowser: some View {
+        ScrollView {
+            slashCommandList
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private var slashCommandList: some View {
+        let commands = SlashCommandDefinition.matching(input)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Slash commands", systemImage: "command")
+                    .font(.headline)
+                Spacer()
+                Text("\(commands.count) available")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if commands.isEmpty {
+                Label("No command matches “\(trimmedInput)”.", systemImage: "questionmark.circle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 18)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(commands.enumerated()), id: \.element.id) { index, command in
+                        Button {
+                            input = command.insertionText
+                            DispatchQueue.main.async { inputFocused = true }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: command.icon)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(HubPalette.hubAccent)
+                                    .frame(width: 28, height: 28)
+                                    .background(HubPalette.hubAccent.opacity(0.10), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(command.usage)
+                                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(HubPalette.primaryText)
+                                    Text(command.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: command.takesArgument ? "arrow.right" : "return")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 52)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(command.detail)
+
+                        if index < commands.count - 1 {
+                            Divider().padding(.leading, 52)
+                        }
+                    }
+                }
+                .background(Color.hubGrouped)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+    }
+
+    private var scheduleTaskPicker: some View {
+        let tasks = appState.schedulableTasks(matching: existingScheduleQuery)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Select a task")
+                        .font(.headline)
+                    Text("Then type its date and time after “at”.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text("\(tasks.count) matches")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if tasks.isEmpty {
+                Label("No unfinished task matches “\(existingScheduleQuery)”.", systemImage: "magnifyingglass")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 18)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(tasks.prefix(12).enumerated()), id: \.element.id) { index, task in
+                        Button {
+                            input = "/schedule \(task.title) at "
+                            DispatchQueue.main.async { inputFocused = true }
+                        } label: {
+                            HStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                    .fill(task.course.accent)
+                                    .frame(width: 4, height: 30)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(task.title)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(HubPalette.primaryText)
+                                        .lineLimit(1)
+                                    Text([task.course.title, task.estimatedDurationLabel].compactMap { $0 }.joined(separator: " · "))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                let blockCount = appState.scheduleBlocks.filter { $0.linkedTaskID == task.id }.count
+                                if blockCount > 0 {
+                                    Text("\(blockCount) block\(blockCount == 1 ? "" : "s")")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(HubPalette.hubAccent)
+                                }
+                                Image(systemName: "arrow.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 52)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                appState.deleteTask(task.id)
+                            } label: {
+                                Label("Delete task", systemImage: "trash")
+                            }
+                        }
+
+                        if index < min(tasks.count, 12) - 1 {
+                            Divider().padding(.leading, 28)
+                        }
+                    }
+                }
+                .background(Color.hubGrouped)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+
+            Text("Create a new one with: schedule Essay outline at 4 pm 45m")
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+        }
+    }
 
     private var actionsList: some View {
         ScrollView {
@@ -327,6 +510,7 @@ struct QuickCommandView: View {
         case .date: return HubPalette.hubAccent
         case .time: return Color(red: 0.95, green: 0.5, blue: 0.2)
         case .course: return draft.course.accent
+        case .estimate: return HubPalette.success
         }
     }
 
@@ -375,7 +559,26 @@ struct QuickCommandView: View {
         VStack(spacing: 0) {
             metadataRow(icon: "tag.fill", iconColor: draft.course.accent, label: "Space", value: draft.course.title)
             Divider().padding(.leading, 36)
-            metadataRow(icon: "calendar", iconColor: HubPalette.hubAccent, label: selectedAction == .addProject ? "Deadline" : "When", value: metadataDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))
+            metadataRow(
+                icon: "calendar",
+                iconColor: HubPalette.hubAccent,
+                label: selectedAction == .addProject ? "Deadline" : (selectedAction == .schedule ? "Planned" : "Due"),
+                value: metadataDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute())
+            )
+            if selectedAction == .schedule, draft.plannedDate != nil {
+                Divider().padding(.leading, 36)
+                metadataRow(
+                    icon: "calendar.badge.exclamationmark",
+                    iconColor: HubPalette.yellow,
+                    label: "Due",
+                    value: draft.dueDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute())
+                )
+            }
+            if let estimate = draft.estimatedMinutes,
+               selectedAction == .createTask || selectedAction == .schedule {
+                Divider().padding(.leading, 36)
+                metadataRow(icon: "hourglass", iconColor: HubPalette.success, label: "Predicted time", value: estimate.studyDurationLabel)
+            }
             if let note = draft.linkedNote {
                 Divider().padding(.leading, 36)
                 metadataRow(icon: "doc.text.fill", iconColor: Color(red: 0.4, green: 0.7, blue: 0.4), label: "Linked note", value: note)
@@ -423,7 +626,12 @@ struct QuickCommandView: View {
 
             if selectedAction == .createTask {
                 Button {
-                    let task = appState.addTask(title: draft.title, course: draft.course, dueDate: draft.dueDate)
+                    let task = appState.addTask(
+                        title: draft.title,
+                        course: draft.course,
+                        dueDate: draft.dueDate,
+                        estimatedMinutes: draft.estimatedMinutes ?? 30
+                    )
                     let components = Calendar.current.dateComponents([.hour, .minute], from: draft.dueDate)
                     appState.schedule(task.id, at: Double(components.hour ?? 16) + Double(components.minute ?? 0) / 60, on: draft.dueDate)
                     onDismiss()
@@ -506,8 +714,12 @@ struct QuickCommandView: View {
     // MARK: - Actions
 
     private func executeAction() {
-        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = trimmedInput
         guard !trimmed.isEmpty else { return }
+        if appState.performSlashCommand(trimmed) {
+            onDismiss()
+            return
+        }
         switch selectedAction {
         case .createTask:
             appState.createTask(from: draft)
@@ -529,11 +741,20 @@ struct QuickCommandView: View {
                 return
             }
         case .schedule:
-            let task = appState.addTask(title: draft.title, course: draft.course, dueDate: draft.dueDate)
-            let components = Calendar.current.dateComponents([.hour, .minute], from: draft.dueDate)
-            let hour = Double(components.hour ?? 16) + Double(components.minute ?? 0) / 60
-            appState.schedule(task.id, at: hour, on: draft.dueDate)
-            appState.navigate(to: .calendar)
+            if case .scheduleExistingTask(let query) = interpretation.intent {
+                guard let task = appState.scheduleTask(
+                    matching: query,
+                    to: interpretation.plannedDate,
+                    durationMinutes: draft.estimatedMinutes
+                ) else {
+                    appState.statusMessage = query.isEmpty ? "Choose a task after /schedule" : "No task matched “\(query)”"
+                    return
+                }
+                appState.statusMessage = "Scheduled \(task.title) for \(interpretation.plannedDate.formatted(date: .abbreviated, time: .shortened))"
+            } else {
+                appState.createScheduledTask(from: draft)
+            }
+            appState.navigate(to: .today)
         case .addProject:
             let project = appState.addProject(title: projectTitle, course: draft.course, deadline: projectDeadline)
             appState.statusMessage = "Created project \(project.title)"
@@ -598,7 +819,11 @@ struct QuickCommandView: View {
         }
     }
 
-    private var metadataDate: Date { selectedAction == .addProject ? projectDeadline : draft.dueDate }
+    private var metadataDate: Date {
+        if selectedAction == .addProject { return projectDeadline }
+        if selectedAction == .schedule { return interpretation.plannedDate }
+        return draft.dueDate
+    }
 
     private func updateSuggestedAction() {
         if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -607,6 +832,8 @@ struct QuickCommandView: View {
         }
         switch interpretation.intent {
         case .capture: selectedAction = .capture
+        case .scheduleTask: selectedAction = .schedule
+        case .scheduleExistingTask: selectedAction = .schedule
         case .createProject: selectedAction = .addProject
         case .createNote: selectedAction = .createNote
         case .rescheduleTask: selectedAction = .reschedule

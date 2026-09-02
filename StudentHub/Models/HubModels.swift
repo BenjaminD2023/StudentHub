@@ -66,6 +66,30 @@ struct Course: Codable, Hashable, Identifiable {
     }
 }
 
+enum RecurrenceRule: String, CaseIterable, Identifiable, Codable, Hashable {
+    case daily
+    case weekly
+    case monthly
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .daily: "Every day"
+        case .weekly: "Every week"
+        case .monthly: "Every month"
+        }
+    }
+
+    func nextDate(after date: Date, calendar: Calendar = .current) -> Date? {
+        switch self {
+        case .daily: calendar.date(byAdding: .day, value: 1, to: date)
+        case .weekly: calendar.date(byAdding: .weekOfYear, value: 1, to: date)
+        case .monthly: calendar.date(byAdding: .month, value: 1, to: date)
+        }
+    }
+}
+
 struct HubTask: Identifiable, Hashable, Codable {
     let id: UUID
     var title: String
@@ -78,8 +102,11 @@ struct HubTask: Identifiable, Hashable, Codable {
     var linkedNoteID: UUID?
     var project: String?
     var linkedNote: String?
+    var estimatedMinutes: Int?
     var details: String
     var createdAt: Date
+    var recurrence: RecurrenceRule?
+    var nextOccurrenceID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -93,8 +120,11 @@ struct HubTask: Identifiable, Hashable, Codable {
         linkedNoteID: UUID? = nil,
         project: String? = nil,
         linkedNote: String? = nil,
+        estimatedMinutes: Int? = 30,
         details: String = "",
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        recurrence: RecurrenceRule? = nil,
+        nextOccurrenceID: UUID? = nil
     ) {
         self.id = id
         self.title = title
@@ -107,12 +137,28 @@ struct HubTask: Identifiable, Hashable, Codable {
         self.linkedNoteID = linkedNoteID
         self.project = project
         self.linkedNote = linkedNote
+        self.estimatedMinutes = estimatedMinutes
         self.details = details
         self.createdAt = createdAt
+        self.recurrence = recurrence
+        self.nextOccurrenceID = nextOccurrenceID
     }
 
     var dueTimeLabel: String {
         dueDate.formatted(date: .omitted, time: .shortened)
+    }
+
+    var estimatedDurationLabel: String? {
+        estimatedMinutes.flatMap { $0 > 0 ? $0.studyDurationLabel : nil }
+    }
+}
+
+extension Int {
+    var studyDurationLabel: String {
+        guard self >= 60 else { return "\(self)m" }
+        let hours = self / 60
+        let minutes = self % 60
+        return minutes == 0 ? "\(hours)h" : "\(hours)h \(minutes)m"
     }
 }
 
@@ -151,6 +197,8 @@ struct QuickCommandDraft: Equatable {
     var title: String
     var course: Course
     var dueDate: Date
+    var plannedDate: Date? = nil
+    var estimatedMinutes: Int? = nil
     var linkedNote: String?
     var recognizedTokens: [CommandToken] = []
 }
@@ -160,6 +208,7 @@ struct CommandToken: Equatable, Identifiable {
         case date
         case time
         case course
+        case estimate
     }
 
     let kind: Kind
@@ -172,12 +221,64 @@ struct CommandToken: Equatable, Identifiable {
         case .date: "calendar"
         case .time: "clock"
         case .course: "tag"
+        case .estimate: "hourglass"
         }
+    }
+}
+
+struct SlashCommandDefinition: Identifiable {
+    let command: String
+    let usage: String
+    let detail: String
+    let icon: String
+    let takesArgument: Bool
+
+    var id: String { command }
+    var insertionText: String { takesArgument ? command + " " : command }
+
+    static let all: [SlashCommandDefinition] = [
+        .init(command: "/task", usage: "/task <title> [date] [time] [duration]", detail: "Create a task", icon: "checkmark.square", takesArgument: true),
+        .init(command: "/schedule", usage: "/schedule <task> at <time>", detail: "Plan an existing task", icon: "calendar.badge.plus", takesArgument: true),
+        .init(command: "/capture", usage: "/capture <thought>", detail: "Save to Scratchpad", icon: "square.and.pencil", takesArgument: true),
+        .init(command: "/project", usage: "/project <title> [deadline]", detail: "Create a project", icon: "folder.badge.plus", takesArgument: true),
+        .init(command: "/note", usage: "/note <title>", detail: "Create a Markdown note", icon: "doc.badge.plus", takesArgument: true),
+        .init(command: "/today", usage: "/today", detail: "Open today", icon: "sun.max", takesArgument: false),
+        .init(command: "/inbox", usage: "/inbox", detail: "Open the inbox", icon: "tray", takesArgument: false),
+        .init(command: "/tasks", usage: "/tasks", detail: "Open all tasks", icon: "checklist", takesArgument: false),
+        .init(command: "/calendar", usage: "/calendar", detail: "Open the calendar", icon: "calendar", takesArgument: false),
+        .init(command: "/projects", usage: "/projects", detail: "Open projects", icon: "folder", takesArgument: false),
+        .init(command: "/notes", usage: "/notes", detail: "Open notes", icon: "doc.text", takesArgument: false),
+        .init(command: "/files", usage: "/files", detail: "Open files and PDFs", icon: "doc.on.doc", takesArgument: false),
+        .init(command: "/journal", usage: "/journal", detail: "Open the journal", icon: "book.closed", takesArgument: false),
+        .init(command: "/meetings", usage: "/meetings", detail: "Open meetings", icon: "person.2", takesArgument: false),
+        .init(command: "/reminders", usage: "/reminders", detail: "Open reminders", icon: "bell", takesArgument: false),
+        .init(command: "/pomo", usage: "/pomo", detail: "Start a 25-minute focus session", icon: "timer", takesArgument: false),
+        .init(command: "/timer", usage: "/timer", detail: "Start a stopwatch", icon: "stopwatch", takesArgument: false),
+        .init(command: "/export", usage: "/export", detail: "Open export tools", icon: "square.and.arrow.up", takesArgument: false)
+    ]
+
+    static func matching(_ input: String) -> [SlashCommandDefinition] {
+        let query = input.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard query.hasPrefix("/") else { return [] }
+        guard query != "/" else { return all }
+        let words = String(query.dropFirst())
+        return all.filter {
+            $0.command.hasPrefix(query) ||
+            query.hasPrefix($0.command + " ") ||
+            $0.detail.lowercased().contains(words)
+        }
+    }
+
+    static func hasEnteredArgument(in input: String) -> Bool {
+        let lowered = input.lowercased()
+        return all.contains { $0.takesArgument && lowered.hasPrefix($0.command + " ") }
     }
 }
 
 enum CommandIntent: Equatable {
     case createTask
+    case scheduleTask
+    case scheduleExistingTask(query: String)
     case capture(text: String)
     case createProject
     case createNote
@@ -195,9 +296,13 @@ struct CommandInterpretation: Equatable {
     let intent: CommandIntent
     let draft: QuickCommandDraft
 
+    var plannedDate: Date { draft.plannedDate ?? draft.dueDate }
+
     var summary: String {
         switch intent {
         case .createTask: "Create a new task"
+        case .scheduleTask: "Schedule a task"
+        case .scheduleExistingTask(let query): query.isEmpty ? "Choose a task to schedule" : "Schedule “\(query)”"
         case .capture: "Save to the scratchpad"
         case .createProject: "Create a new project"
         case .createNote: "Create a new note"
@@ -215,17 +320,83 @@ struct CommandInterpretation: Equatable {
     }
 }
 
+private struct EscapedCommandInput {
+    let protected: String
+    private let escaped: [String]
+
+    init(_ input: String, phrases: [String] = []) {
+        var protected = ""
+        var escaped: [String] = []
+        var index = input.startIndex
+
+        while index < input.endIndex {
+            guard input[index] == "\\" else {
+                protected.append(input[index])
+                index = input.index(after: index)
+                continue
+            }
+
+            let next = input.index(after: index)
+            guard next < input.endIndex, !input[next].isWhitespace else {
+                protected.append(input[index])
+                index = next
+                continue
+            }
+
+            let end = phrases
+                .sorted { $0.count > $1.count }
+                .compactMap { phrase -> String.Index? in
+                    guard !phrase.isEmpty,
+                          let range = input.range(
+                              of: phrase,
+                              options: [.caseInsensitive, .anchored],
+                              range: next..<input.endIndex
+                          ),
+                          range.upperBound == input.endIndex || !(input[range.upperBound].isLetter || input[range.upperBound].isNumber) else {
+                        return nil
+                    }
+                    return range.upperBound
+                }
+                .first ?? input[next...].firstIndex(where: \.isWhitespace) ?? input.endIndex
+            escaped.append(String(input[next..<end]))
+            protected += Self.marker(for: escaped.count - 1)
+            index = end
+        }
+
+        self.protected = protected
+        self.escaped = escaped
+    }
+
+    func restore(_ input: String) -> String {
+        escaped.enumerated().reduce(input) { result, entry in
+            result.replacingOccurrences(of: Self.marker(for: entry.offset), with: entry.element)
+        }
+    }
+
+    func restoreEscapes(_ input: String) -> String {
+        escaped.enumerated().reduce(input) { result, entry in
+            result.replacingOccurrences(of: Self.marker(for: entry.offset), with: "\\" + entry.element)
+        }
+    }
+
+    private static func marker(for index: Int) -> String {
+        "\u{E000}\(index)\u{E001}"
+    }
+}
+
 enum CommandInterpreter {
     static func interpret(_ input: String, now: Date = Date(), calendar: Calendar = .current, spaces: [Course] = Course.allCases) -> CommandInterpretation {
-        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let escaped = EscapedCommandInput(source, phrases: spaces.map(\.title))
+        let trimmed = escaped.protected.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowered = trimmed.lowercased()
-        let draft = CommandParser.parse(trimmed, now: now, calendar: calendar, spaces: spaces)
+        let draft = CommandParser.parse(source, now: now, calendar: calendar, spaces: spaces)
 
         if let timerCommand = timerCommand(in: lowered) {
             return CommandInterpretation(intent: .startTimer(timerCommand), draft: draft)
         }
         if let capture = payload(in: trimmed, prefixes: ["/capture", "capture:", "save to scratchpad"]) {
-            return CommandInterpretation(intent: .capture(text: capture), draft: draft)
+            return CommandInterpretation(intent: .capture(text: escaped.restore(capture)), draft: draft)
         }
         if payload(in: trimmed, prefixes: ["/project", "create project", "new project"]) != nil {
             return CommandInterpretation(intent: .createProject, draft: draft)
@@ -233,15 +404,84 @@ enum CommandInterpreter {
         if payload(in: trimmed, prefixes: ["/note", "create note", "new note"]) != nil {
             return CommandInterpretation(intent: .createNote, draft: draft)
         }
+        if let clause = inlineScheduleClause(in: trimmed) {
+            var taskDraft = CommandParser.parse(escaped.restoreEscapes(clause.task), now: now, calendar: calendar, spaces: spaces)
+            let planningDraft = CommandParser.parse(escaped.restoreEscapes(clause.plan), now: now, calendar: calendar, spaces: spaces)
+            if !taskDraft.recognizedTokens.contains(where: { $0.kind == .date || $0.kind == .time }) {
+                taskDraft.dueDate = planningDraft.dueDate
+            }
+            taskDraft.plannedDate = planningDraft.dueDate
+            taskDraft.estimatedMinutes = taskDraft.estimatedMinutes ?? planningDraft.estimatedMinutes
+            for token in planningDraft.recognizedTokens
+                where token.kind == .date || token.kind == .time || token.kind == .estimate {
+                if !taskDraft.recognizedTokens.contains(token) {
+                    taskDraft.recognizedTokens.append(token)
+                }
+            }
+            return CommandInterpretation(intent: .scheduleTask, draft: taskDraft)
+        }
+        if let clause = leadingScheduleDueClause(in: trimmed) {
+            var taskDraft = CommandParser.parse(escaped.restoreEscapes(clause.plan), now: now, calendar: calendar, spaces: spaces)
+            let dueDraft = CommandParser.parse(escaped.restoreEscapes(clause.due), now: now, calendar: calendar, spaces: spaces)
+            taskDraft.plannedDate = taskDraft.dueDate
+            taskDraft.dueDate = dueDraft.dueDate
+            for token in dueDraft.recognizedTokens where token.kind == .date || token.kind == .time {
+                if !taskDraft.recognizedTokens.contains(token) {
+                    taskDraft.recognizedTokens.append(token)
+                }
+            }
+            return CommandInterpretation(intent: .scheduleTask, draft: taskDraft)
+        }
+        if let existingTask = payload(in: trimmed, prefixes: ["/schedule"]) {
+            let query = existingTask.isEmpty || draft.title == "Untitled task" ? "" : draft.title
+            return CommandInterpretation(intent: .scheduleExistingTask(query: query), draft: draft)
+        }
+        if payload(in: trimmed, prefixes: ["schedule", "schedule:"]) != nil {
+            return CommandInterpretation(intent: .scheduleTask, draft: draft)
+        }
         if let target = rescheduleTarget(in: trimmed) {
-            return CommandInterpretation(intent: .rescheduleTask(query: target), draft: draft)
+            return CommandInterpretation(intent: .rescheduleTask(query: escaped.restore(target)), draft: draft)
         }
         if lowered.hasPrefix("find ") || lowered.hasPrefix("search ") {
             let query = String(trimmed.dropFirst(lowered.hasPrefix("find ") ? 5 : 7))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            return CommandInterpretation(intent: .search(query: query), draft: draft)
+            return CommandInterpretation(intent: .search(query: escaped.restore(query)), draft: draft)
         }
         return CommandInterpretation(intent: .createTask, draft: draft)
+    }
+
+    private static func inlineScheduleClause(in input: String) -> (task: String, plan: String)? {
+        guard let marker = input.range(
+            of: #"\s+\bschedule\b\s*"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) else { return nil }
+        let task = input[..<marker.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+        var plan = input[marker.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+        plan = plan.replacingOccurrences(
+            of: #"(?i)^(?:(?:it\s+)?(?:for|at|on)\s+|it\s+)"#,
+            with: "",
+            options: .regularExpression
+        )
+        guard !task.isEmpty, !plan.isEmpty else { return nil }
+        return (task, plan)
+    }
+
+    private static func leadingScheduleDueClause(in input: String) -> (plan: String, due: String)? {
+        let lowered = input.lowercased()
+        guard lowered.hasPrefix("schedule ") || lowered.hasPrefix("schedule:") else { return nil }
+        let body = input.replacingOccurrences(
+            of: #"(?i)^schedule(?::|\s+)\s*"#,
+            with: "",
+            options: .regularExpression
+        )
+        guard let marker = body.range(
+            of: #"\s+\b(?:due|by)\b\s*"#,
+            options: [.regularExpression, .caseInsensitive, .backwards]
+        ) else { return nil }
+        let plan = body[..<marker.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+        let due = body[marker.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !plan.isEmpty, !due.isEmpty else { return nil }
+        return (plan, due)
     }
 
     private static func timerCommand(in input: String) -> FocusTimerCommand? {
@@ -302,7 +542,9 @@ enum CommandInterpreter {
 }
 
 enum CommandParser {
-    static func parse(_ input: String, now: Date = Date(), calendar: Calendar = .current, spaces: [Course] = Course.allCases) -> QuickCommandDraft {
+    static func parse(_ source: String, now: Date = Date(), calendar: Calendar = .current, spaces: [Course] = Course.allCases) -> QuickCommandDraft {
+        let escaped = EscapedCommandInput(source, phrases: spaces.map(\.title))
+        let input = escaped.protected
         let lowered = input.lowercased()
         let fallback = spaces.first(where: { $0.id == Course.general.id }) ?? spaces.first ?? .general
         let resolvedCourse = resolveCourse(in: input, spaces: spaces)
@@ -346,6 +588,11 @@ enum CommandParser {
             recognizedTokens.append(CommandToken(kind: .time, text: simpleHour.full))
         }
 
+        let parsedEstimate = workloadEstimate(in: input)
+        if let parsedEstimate {
+            recognizedTokens.append(CommandToken(kind: .estimate, text: parsedEstimate.label))
+        }
+
         if course != .general {
             recognizedTokens.append(CommandToken(kind: .course, text: course.title))
         }
@@ -362,11 +609,16 @@ enum CommandParser {
             title = title.replacingOccurrences(of: token.text, with: "", options: [.caseInsensitive])
         }
         title = title.replacingOccurrences(
-            of: #"(?i)^\s*(?:/(?:capture|project|note)|create\s+(?:project|note)|new\s+(?:project|note)|save\s+to\s+scratchpad|capture:)\s*"#,
+            of: #"(?i)^\s*(?:/(?:capture|project|note|schedule|task)|create\s+(?:project|note)|new\s+(?:project|note)|save\s+to\s+scratchpad|capture:|schedule:)\s*"#,
             with: "",
             options: .regularExpression
         )
-        title = title.replacingOccurrences(of: #"(?i)^\s*(?:add|create|task|move|reschedule)\s+"#, with: "", options: .regularExpression)
+        title = title.replacingOccurrences(of: #"(?i)^\s*(?:add|create|task|move|reschedule|schedule)\s+"#, with: "", options: .regularExpression)
+        if firstMatch(#"(?i)^\s*(?:/schedule|schedule(?::|\s|$))"#, in: input) != nil {
+            while title.range(of: #"(?i)^\s*(?:for|at|on)\s+"#, options: .regularExpression) != nil {
+                title = title.replacingOccurrences(of: #"(?i)^\s*(?:for|at|on)\s+"#, with: "", options: .regularExpression)
+            }
+        }
         title = title.replacingOccurrences(of: #"\s+#\w+"#, with: "", options: .regularExpression)
         let keepSubjectInTitle = firstMatch(
             #"(?i)^\s*(?:/(?:project|note)|create\s+(?:project|note)|new\s+(?:project|note))\b"#,
@@ -384,6 +636,7 @@ enum CommandParser {
             title = title.replacingOccurrences(of: trailingConnector, with: "", options: .regularExpression)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        title = escaped.restore(title)
         if let first = title.first {
             title.replaceSubrange(title.startIndex...title.startIndex, with: String(first).uppercased())
         }
@@ -392,9 +645,27 @@ enum CommandParser {
             title: title.isEmpty ? "Untitled task" : title,
             course: course,
             dueDate: dueDate,
+            estimatedMinutes: parsedEstimate?.minutes,
             linkedNote: course.id == Course.chemistry.id ? "Lab Notes.md" : nil,
             recognizedTokens: recognizedTokens
         )
+    }
+
+    private static func workloadEstimate(in input: String) -> (minutes: Int, label: String)? {
+        guard let match = firstMatch(
+            #"(?i)\b(?:(\d+)\s*h(?:\s*(\d+)\s*m)?|(\d+)\s*m)\b"#,
+            in: input
+        ) else { return nil }
+
+        let minutes: Int
+        if let hours = Int(match.groups[0]) {
+            let remainder = Int(match.groups[1]) ?? 0
+            guard remainder < 60 else { return nil }
+            minutes = hours * 60 + remainder
+        } else {
+            minutes = Int(match.groups[2]) ?? 0
+        }
+        return minutes > 0 ? (minutes, match.full) : nil
     }
 
     private static let subjectAliases: [String: [String]] = [
@@ -591,8 +862,11 @@ enum CommandParser {
             let label = input.contains("后天") ? "后天" : matchedText(#"(?i)day after tomorrow"#, in: input, fallback: "day after tomorrow")
             return (calendar.date(byAdding: .day, value: 2, to: now) ?? now, label)
         }
-        if lowered.contains("tomorrow") || input.contains("明天") {
-            let label = input.contains("明天") ? "明天" : matchedText(#"(?i)tomorrow"#, in: input, fallback: "tomorrow")
+        if let tomorrow = firstMatch(#"(?i)\btomor+ow\b"#, in: input) {
+            return (calendar.date(byAdding: .day, value: 1, to: now) ?? now, tomorrow.full)
+        }
+        if input.contains("明天") {
+            let label = "明天"
             return (calendar.date(byAdding: .day, value: 1, to: now) ?? now, label)
         }
         if lowered.contains("today") || lowered.contains("tonight") || input.contains("今天") || input.contains("今晚") {

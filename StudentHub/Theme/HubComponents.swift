@@ -127,6 +127,19 @@ struct QuickCaptureField: View {
         switch interpretation.intent {
         case .createTask:
             appState.createTask(from: interpretation.draft)
+        case .scheduleTask:
+            appState.createScheduledTask(from: interpretation.draft)
+            appState.navigate(to: .today)
+        case .scheduleExistingTask(let query):
+            guard appState.scheduleTask(
+                matching: query,
+                to: interpretation.plannedDate,
+                durationMinutes: interpretation.draft.estimatedMinutes
+            ) != nil else {
+                appState.statusMessage = query.isEmpty ? "Choose a task after /schedule" : "No task matched “\(query)”"
+                return
+            }
+            appState.navigate(to: .today)
         case .capture(let capture):
             guard !capture.isEmpty else { return }
             appState.addCapture(capture)
@@ -164,6 +177,7 @@ struct QuickCaptureField: View {
 /// A colored block used in the Today timeline and the day timeline.
 /// Renders the course color, title, and subtitle.
 struct ScheduleBlockCard: View {
+    @EnvironmentObject private var appState: AppState
     let block: ScheduleBlock
     var compact: Bool = false
 
@@ -198,6 +212,21 @@ struct ScheduleBlockCard: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(block.course.accent.opacity(0.45), lineWidth: 0.5)
         )
+        .contextMenu {
+            Button {
+                appState.deleteScheduleBlock(block.id)
+            } label: {
+                Label("Remove from schedule", systemImage: "calendar.badge.minus")
+            }
+            if let taskID = block.linkedTaskID {
+                Divider()
+                Button(role: .destructive) {
+                    appState.deleteTask(taskID)
+                } label: {
+                    Label("Delete task", systemImage: "trash")
+                }
+            }
+        }
     }
 }
 
@@ -209,6 +238,7 @@ struct TaskChecklistRow: View {
     @EnvironmentObject private var appState: AppState
     let task: HubTask
     var showSpace: Bool = true
+    var timingLabel: String? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -242,15 +272,33 @@ struct TaskChecklistRow: View {
                     if showSpace {
                         Text("·").font(.system(size: 12)).foregroundStyle(HubPalette.tertiaryText)
                     }
-                    Text(dueLabel)
+                    Text(timingLabel ?? dueLabel)
                         .font(.system(size: 12, weight: task.isOverdue ? .semibold : .regular))
                         .foregroundStyle(task.isOverdue ? HubPalette.red : HubPalette.secondaryText)
+                    if let estimate = task.estimatedDurationLabel {
+                        Text("· \(estimate)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(HubPalette.secondaryText)
+                    }
+                    if let recurrence = task.recurrence {
+                        Image(systemName: "repeat")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(HubPalette.secondaryText)
+                            .help(recurrence.title)
+                    }
                 }
             }
             Spacer(minLength: 4)
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
+        .contextMenu {
+            Button(role: .destructive) {
+                appState.deleteTask(task.id)
+            } label: {
+                Label("Delete task", systemImage: "trash")
+            }
+        }
     }
 
     private var dueLabel: String {
@@ -381,6 +429,25 @@ struct MoreCard: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(HubPalette.separator, lineWidth: 0.5)
         )
+    }
+}
+
+struct HubRecurrencePicker: View {
+    let title: String
+    @Binding var selection: RecurrenceRule?
+
+    init(_ title: String = "Repeat", selection: Binding<RecurrenceRule?>) {
+        self.title = title
+        _selection = selection
+    }
+
+    var body: some View {
+        Picker(title, selection: $selection) {
+            Text("Never").tag(Optional<RecurrenceRule>.none)
+            ForEach(RecurrenceRule.allCases) { rule in
+                Text(rule.title).tag(Optional(rule))
+            }
+        }
     }
 }
 

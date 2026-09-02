@@ -621,9 +621,15 @@ struct HubTaskRow: View {
                 Text(task.title)
                     .strikethrough(task.isCompleted)
                     .font(.system(size: 14, weight: .semibold))
-                Text("\(task.course.title) · \(formattedDue)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 3) {
+                    Text("\(task.course.title) · \(formattedDue)")
+                    if let estimate = task.estimatedDurationLabel {
+                        Text("· \(estimate)")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
             Spacer()
             Text(task.dueTimeLabel)
@@ -632,6 +638,14 @@ struct HubTaskRow: View {
         }
         .padding(.horizontal, 14)
         .frame(minHeight: 52)
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button(role: .destructive) {
+                appState.deleteTask(task.id)
+            } label: {
+                Label("Delete task", systemImage: "trash")
+            }
+        }
     }
 
     private var formattedDue: String {
@@ -666,6 +680,7 @@ struct HubNoteRow: View {
 }
 
 struct HubScheduleRow: View {
+    @EnvironmentObject private var appState: AppState
     let block: ScheduleBlock
 
     var body: some View {
@@ -693,6 +708,22 @@ struct HubScheduleRow: View {
         }
         .padding(.horizontal, 14)
         .frame(minHeight: 48)
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button {
+                appState.deleteScheduleBlock(block.id)
+            } label: {
+                Label("Remove from schedule", systemImage: "calendar.badge.minus")
+            }
+            if let taskID = block.linkedTaskID {
+                Divider()
+                Button(role: .destructive) {
+                    appState.deleteTask(taskID)
+                } label: {
+                    Label("Delete task", systemImage: "trash")
+                }
+            }
+        }
     }
 }
 
@@ -730,9 +761,28 @@ struct TaskInspectorSheet: View {
                         Section("Due") {
                             DatePicker("Due", selection: Binding(get: { draft.dueDate }, set: { v in var d = draft; d.dueDate = v; self.draft = d }), displayedComponents: [.date, .hourAndMinute])
                         }
+                        Section("Repeat") {
+                            HubRecurrencePicker(selection: Binding(get: { draft.recurrence }, set: { v in var d = draft; d.recurrence = v; self.draft = d }))
+                        }
+                        Section("Predicted time") {
+                            Picker("Estimate", selection: Binding(get: { draft.estimatedMinutes }, set: { v in var d = draft; d.estimatedMinutes = v; self.draft = d })) {
+                                Text("Not estimated").tag(Optional<Int>.none)
+                                ForEach([15, 30, 45, 60, 90, 120], id: \.self) { minutes in
+                                    Text(minutes.studyDurationLabel).tag(Optional(minutes))
+                                }
+                            }
+                        }
                         Section("Details") {
                             TextField("Notes", text: Binding(get: { draft.details }, set: { v in var d = draft; d.details = v; self.draft = d }), axis: .vertical)
                                 .lineLimit(3...8)
+                        }
+                        Section {
+                            Button(role: .destructive) {
+                                appState.deleteTask(draft.id)
+                                dismiss()
+                            } label: {
+                                Label("Delete task", systemImage: "trash")
+                            }
                         }
                     }
                 } else {

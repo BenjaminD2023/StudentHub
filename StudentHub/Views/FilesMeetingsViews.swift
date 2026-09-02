@@ -471,6 +471,10 @@ struct MeetingsWorkspaceView: View {
                                     HStack {
                                         Text(meeting.date.formatted(date: .abbreviated, time: .shortened))
                                         Spacer()
+                                        if let recurrence = meeting.recurrence {
+                                            Image(systemName: "repeat")
+                                                .help(recurrence.title)
+                                        }
                                         if !meeting.summary.isEmpty { Image(systemName: "sparkles") }
                                     }
                                     .font(.system(size: 9))
@@ -529,7 +533,11 @@ struct MeetingEditor: View {
                 TextField("Meeting title", text: $draft.title)
                     .font(.system(size: 18, weight: .bold))
                     .textFieldStyle(.plain)
+                    .onSubmit(save)
                 DatePicker("", selection: $draft.date).labelsHidden()
+                HubRecurrencePicker(selection: $draft.recurrence)
+                    .labelsHidden()
+                    .frame(width: 130)
                 Picker("Project", selection: $draft.projectID) {
                     Text("No project").tag(Optional<UUID>.none)
                     ForEach(appState.projects) { project in Text(project.title).tag(Optional(project.id)) }
@@ -581,6 +589,7 @@ struct MeetingEditor: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onDisappear { appState.updateMeeting(draft) }
     }
 
     private func save() {

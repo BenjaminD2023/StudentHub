@@ -110,7 +110,7 @@ private struct MacAppShellView: View {
     }
 
     private func toggleQuickCommand() {
-        NotificationCenter.default.post(name: .toggleQuickPanel, object: nil)
+        QuickPanelController.shared.toggle()
     }
 }
 #else

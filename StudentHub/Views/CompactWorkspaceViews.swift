@@ -31,6 +31,7 @@ private struct CompactTasksView: View {
     let inboxOnly: Bool
     @State private var title = ""
     @State private var course: Course = .general
+    @State private var estimatedMinutes: Int? = 30
     @State private var editingTaskID: UUID?
 
     private var visibleTasks: [HubTask] {
@@ -60,8 +61,16 @@ private struct CompactTasksView: View {
                             .buttonStyle(HubProminentButtonStyle())
                     }
                     Divider()
-                    Picker("Course", selection: $course) {
-                        ForEach(appState.spaces) { Text($0.title).tag($0) }
+                    HStack {
+                        Picker("Course", selection: $course) {
+                            ForEach(appState.spaces) { Text($0.title).tag($0) }
+                        }
+                        Picker("Predicted time", selection: $estimatedMinutes) {
+                            Text("No estimate").tag(Optional<Int>.none)
+                            ForEach([15, 30, 45, 60, 90, 120], id: \.self) { minutes in
+                                Text(minutes.studyDurationLabel).tag(Optional(minutes))
+                            }
+                        }
                     }
                 }
                 .padding(14)
@@ -80,22 +89,41 @@ private struct CompactTasksView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(task.title).font(.system(size: 14, weight: .semibold)).strikethrough(task.isCompleted)
-                                Text("\(task.course.title) • \(task.dueDate.formatted(date: .abbreviated, time: .shortened))")
-                                    .font(.caption)
-                                    .foregroundStyle(HubPalette.secondaryText)
+                                HStack(spacing: 3) {
+                                    Text("\(task.course.title) • \(task.dueDate.formatted(date: .abbreviated, time: .shortened))")
+                                    if let estimate = task.estimatedDurationLabel {
+                                        Text("• \(estimate)")
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(HubPalette.secondaryText)
+                                .lineLimit(1)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .buttonStyle(.plain)
+                        if let recurrence = task.recurrence {
+                            Image(systemName: "repeat").help(recurrence.title)
+                        }
                         Image(systemName: "chevron.right").foregroundStyle(HubPalette.tertiaryText)
                     }
                     .padding(13)
                     .hubPanel(cornerRadius: 12)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            appState.deleteTask(task.id)
+                        } label: {
+                            Label("Delete task", systemImage: "trash")
+                        }
+                    }
                 }
             }
             .padding(18)
         }
         .background(HubPalette.background)
+        .onAppear {
+            if !appState.spaces.contains(course) { course = appState.defaultSpace }
+        }
         .sheet(isPresented: editingTaskPresented) {
             if let task = appState.tasks.first(where: { $0.id == editingTaskID }) {
                 TaskInspectorView(task: task)
@@ -110,7 +138,12 @@ private struct CompactTasksView: View {
     private func addTask() {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        appState.addTask(title: trimmed, course: course, dueDate: Date().addingTimeInterval(3600 * 4))
+        appState.addTask(
+            title: trimmed,
+            course: course,
+            dueDate: Date().addingTimeInterval(3600 * 4),
+            estimatedMinutes: estimatedMinutes
+        )
         title = ""
     }
 }
@@ -532,6 +565,9 @@ private struct CompactMeetingsView: View {
                                 Text(meeting.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
+                            if let recurrence = meeting.recurrence {
+                                Image(systemName: "repeat").help(recurrence.title)
+                            }
                             if !meeting.summary.isEmpty { Image(systemName: "sparkles") }
                             Image(systemName: "chevron.right")
                         }
@@ -567,7 +603,12 @@ private struct CompactMeetingEditor: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    TextField("Meeting title", text: $draft.title).font(.title2.bold()).textFieldStyle(.roundedBorder)
+                    TextField("Meeting title", text: $draft.title)
+                        .font(.title2.bold())
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { appState.updateMeeting(draft) }
+                    DatePicker("When", selection: $draft.date)
+                    HubRecurrencePicker(selection: $draft.recurrence)
                     Picker("Project", selection: $draft.projectID) {
                         Text("No project").tag(Optional<UUID>.none)
                         ForEach(appState.projects) { Text($0.title).tag(Optional($0.id)) }
@@ -591,6 +632,7 @@ private struct CompactMeetingEditor: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { appState.updateMeeting(draft); dismiss() } }
             }
+            .onDisappear { appState.updateMeeting(draft) }
         }
     }
 }
